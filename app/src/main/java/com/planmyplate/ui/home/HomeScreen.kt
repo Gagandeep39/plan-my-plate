@@ -15,7 +15,7 @@ import com.planmyplate.ui.TimelineViewModelFactory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen() {
+fun HomeScreen(onAddMeal: () -> Unit) {
     val context = LocalContext.current
     val database = remember { AppDatabase.getDatabase(context) }
     val viewModel: TimelineViewModel = viewModel(
@@ -29,8 +29,6 @@ fun HomeScreen() {
         if (dayPlans.isNotEmpty()) {
             val todayIndex = dayPlans.indexOfFirst { it.isToday }
             if (todayIndex != -1) {
-                // Calculation: For each day before today, count:
-                // 1 Header + 1 Spacer + N Meals + 1 Add Button
                 var scrollTarget = 0
                 for (i in 0 until todayIndex) {
                     scrollTarget += 1 + 1 + dayPlans[i].meals.size + 1
@@ -61,9 +59,7 @@ fun HomeScreen() {
             dayPlans.forEach { dayPlan ->
                 DailyMealSection(
                     dayPlan = dayPlan,
-                    onAddMealClick = {
-                        // TODO: Navigate to Entry Screen
-                    }
+                    onAddMealClick = onAddMeal
                 )
             }
         }
