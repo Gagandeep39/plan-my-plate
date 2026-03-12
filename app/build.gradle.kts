@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    id("com.google.devtools.ksp") version "2.3.6"
 }
 
 android {
@@ -55,4 +56,27 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+    // Local Database
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+
+    // Handles Google Sign-In and requesting Drive permissions
+    implementation(libs.play.services.auth)
+    // Core Google REST API clients for Android
+    implementation(libs.google.api.client.android)
+    // The specific Google Drive API (v3)
+    implementation(libs.google.api.services.drive)
+    // JSON parser required by the Google HTTP Client
+    implementation(libs.google.http.client.gson)
+
+    // Keeps database queries and network calls off the main thread
+    implementation(libs.kotlinx.coroutines.android)
+    // Converts Google Play Services Tasks (like sign-in) into Coroutines
+    implementation(libs.kotlinx.coroutines.play.services)
+
+    // Connects your data to your UI and survives screen rotations
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.livedata.ktx)
 }
