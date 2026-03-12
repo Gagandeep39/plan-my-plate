@@ -94,6 +94,7 @@ dependencies {
 
     // Connects your data to your UI and survives screen rotations
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.livedata.ktx)
 
     // Additional Material Icons
