@@ -3,6 +3,7 @@ package com.planmyplate.ui
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -15,9 +16,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -95,34 +96,28 @@ fun EntryScreen(sessionId: Long? = null, onBack: () -> Unit) {
                 }
             }
 
-            // Meal Type Selection
+            // Meal Type Selection - Using Segmented Buttons
             Column {
                 Text("Meal Type", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    MealType.entries.forEach { type ->
-                        val isSelected = uiState.mealType == type
-                        Button(
+                    val mealTypes = MealType.entries
+                    mealTypes.forEachIndexed { index, type ->
+                        SegmentedButton(
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = mealTypes.size),
                             onClick = { viewModel.onMealTypeSelected(type) },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(56.dp),
-                            shape = MaterialTheme.shapes.large,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            elevation = if (isSelected) ButtonDefaults.buttonElevation(defaultElevation = 4.dp) else null
-                        ) {
-                            Text(
-                                type.name.lowercase().replaceFirstChar { it.uppercase() },
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                fontSize = 15.sp
-                            )
-                        }
+                            selected = uiState.mealType == type,
+                            label = { 
+                                Text(
+                                    type.name.lowercase().replaceFirstChar { it.uppercase() },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Clip,
+                                    fontSize = 14.sp 
+                                ) 
+                            }
+                        )
                     }
                 }
             }
@@ -167,41 +162,38 @@ fun EntryScreen(sessionId: Long? = null, onBack: () -> Unit) {
                             Icon(Icons.Default.Add, contentDescription = "Add Dish")
                         }
                     },
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.large
+                    singleLine = true
                 )
 
                 if (uiState.dishes.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         uiState.dishes.forEach { dish ->
                             Surface(
                                 onClick = { viewModel.removeDish(dish) },
-                                shape = MaterialTheme.shapes.large,
+                                shape = CircleShape,
                                 color = MaterialTheme.colorScheme.secondaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                                 border = null,
-                                shadowElevation = 2.dp
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
                                         dish, 
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp
+                                        style = MaterialTheme.typography.labelLarge
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
                                     Icon(
                                         Icons.Default.Close,
                                         contentDescription = "Remove",
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
                             }
@@ -217,20 +209,16 @@ fun EntryScreen(sessionId: Long? = null, onBack: () -> Unit) {
                 label = { Text("Notes (Optional)") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
-                placeholder = { Text("e.g. Low carb, extra protein...") },
-                shape = MaterialTheme.shapes.large
+                placeholder = { Text("e.g. Low carb, extra protein...") }
             )
 
-            // Submit Button
+            // Submit Button - Standard Material 3 Button
             Button(
                 onClick = { viewModel.saveMeal() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp),
-                shape = MaterialTheme.shapes.large,
+                modifier = Modifier.fillMaxWidth(),
                 enabled = uiState.dishes.isNotEmpty() || uiState.currentDishName.isNotBlank()
             ) {
-                Text(if (sessionId == null) "Schedule Meal" else "Update Meal", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(if (sessionId == null) "Schedule Meal" else "Update Meal")
             }
         }
     }
