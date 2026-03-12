@@ -63,7 +63,8 @@ fun HomeScreen() {
         var todayIndex = 0
         for (plan in dayPlans) {
             if (plan.isToday) break
-            todayIndex += 1 + plan.meals.size + 1
+            // Header + Spacer + Meals
+            todayIndex += 1 + 1 + plan.meals.size
         }
         listState.scrollToItem(todayIndex)
     }
@@ -94,6 +95,11 @@ fun HomeScreen() {
                     )
                 }
 
+                // Gap between Header and First Item
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
                 itemsIndexed(dayPlan.meals) { index, meal ->
                     TimelineItem(
                         meal = meal,
@@ -102,18 +108,11 @@ fun HomeScreen() {
                     )
                 }
                 
-                item {
-                    Spacer(modifier = Modifier.height(32.dp))
-                }
+                // No extra spacer here: the TimelineItem's built-in spacer 
+                // now handles the gap to the next header consistently.
             }
         }
     }
-}
-
-@Composable
-fun HeaderItem(title: String) {
-    // Overloaded to keep it simple if subtitle is not needed
-    HeaderItem(title = title, subtitle = null)
 }
 
 @Composable
@@ -126,7 +125,7 @@ fun HeaderItem(title: String, subtitle: String?) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 12.dp) // Mathematically set bottom padding
+                .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
             Text(
                 text = title,
