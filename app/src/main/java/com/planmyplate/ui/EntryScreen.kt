@@ -15,9 +15,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.planmyplate.data.AppDatabase
 import com.planmyplate.model.MealType
@@ -99,15 +101,28 @@ fun EntryScreen(onBack: () -> Unit) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     MealType.entries.forEach { type ->
-                        FilterChip(
-                            selected = uiState.mealType == type,
+                        val isSelected = uiState.mealType == type
+                        Button(
                             onClick = { viewModel.onMealTypeSelected(type) },
-                            label = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                            modifier = Modifier.weight(1f)
-                        )
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp),
+                            shape = MaterialTheme.shapes.large,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            elevation = if (isSelected) ButtonDefaults.buttonElevation(defaultElevation = 4.dp) else null
+                        ) {
+                            Text(
+                                type.name.lowercase().replaceFirstChar { it.uppercase() },
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                fontSize = 15.sp
+                            )
+                        }
                     }
                 }
             }
@@ -152,31 +167,44 @@ fun EntryScreen(onBack: () -> Unit) {
                             Icon(Icons.Default.Add, contentDescription = "Add Dish")
                         }
                     },
-                    singleLine = true
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.large
                 )
 
                 if (uiState.dishes.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    // Replaced FlowRow with a scrollable Row to avoid the experimental API crash
+                    Spacer(modifier = Modifier.height(16.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         uiState.dishes.forEach { dish ->
-                            InputChip(
-                                selected = true,
+                            Surface(
                                 onClick = { viewModel.removeDish(dish) },
-                                label = { Text(dish) },
-                                trailingIcon = {
+                                shape = MaterialTheme.shapes.large,
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                border = null,
+                                shadowElevation = 2.dp
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        dish, 
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Icon(
                                         Icons.Default.Close,
                                         contentDescription = "Remove",
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
-                            )
+                            }
                         }
                     }
                 }
@@ -189,19 +217,20 @@ fun EntryScreen(onBack: () -> Unit) {
                 label = { Text("Notes (Optional)") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
-                placeholder = { Text("e.g. Low carb, extra protein...") }
+                placeholder = { Text("e.g. Low carb, extra protein...") },
+                shape = MaterialTheme.shapes.large
             )
 
-            // Submit Button - Enabled if there are added dishes or a current dish name typed
+            // Submit Button
             Button(
                 onClick = { viewModel.saveMeal() },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
-                shape = MaterialTheme.shapes.medium,
+                    .height(64.dp),
+                shape = MaterialTheme.shapes.large,
                 enabled = uiState.dishes.isNotEmpty() || uiState.currentDishName.isNotBlank()
             ) {
-                Text("Schedule Meal", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Schedule Meal", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
         }
     }
