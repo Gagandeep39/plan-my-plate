@@ -1,72 +1,47 @@
 package com.planmyplate.ui.home
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.planmyplate.model.DayPlan
-import com.planmyplate.model.Meal
-import com.planmyplate.model.MealType
-import java.text.SimpleDateFormat
-import java.util.*
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.planmyplate.data.AppDatabase
+import com.planmyplate.ui.TimelineViewModel
+import com.planmyplate.ui.TimelineViewModelFactory
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen() {
-    val dateFormat = SimpleDateFormat("EEEE, MMMM dd", Locale.getDefault())
+    val context = LocalContext.current
+    val database = remember { AppDatabase.getDatabase(context) }
+    val viewModel: TimelineViewModel = viewModel(
+        factory = TimelineViewModelFactory(database.mealDao())
+    )
     
-    val dayPlans = remember {
-        val list = mutableListOf<DayPlan>()
-        val calendar = Calendar.getInstance()
-        calendar.add(Calendar.DAY_OF_YEAR, -2)
-        
-        for (i in -2..2) {
-            val dateStr = dateFormat.format(calendar.time)
-            val title = when (i) {
-                0 -> "Today's Plan"
-                -1 -> "Yesterday"
-                else -> dateStr
-            }
-            
-            list.add(
-                DayPlan(
-                    headerTitle = title,
-                    meals = listOf(
-                        Meal("${i}_1", "Sample Breakfast $i", 8, 0, MealType.BREAKFAST),
-                        Meal("${i}_2", "Sample Lunch $i", 13, 0, MealType.LUNCH),
-                        Meal("${i}_3", "Sample Dinner $i", 19, 0, MealType.DINNER)
-                    ),
-                    isToday = i == 0,
-                    subtitle = if (i == 0) dateStr else null
-                )
-            )
-            calendar.add(Calendar.DAY_OF_YEAR, 1)
-        }
-        list
-    }
-
+    val dayPlans by viewModel.timelineState.collectAsState()
     val listState = rememberLazyListState()
 
-    LaunchedEffect(Unit) {
-        var todayIndex = 0
-        for (plan in dayPlans) {
-            if (plan.isToday) break
-            // Header + Spacer + Meals
-            todayIndex += 1 + 1 + plan.meals.size
+    LaunchedEffect(dayPlans) {
+        if (dayPlans.isNotEmpty()) {
+            val todayIndex = dayPlans.indexOfFirst { it.isToday }
+            if (todayIndex != -1) {
+                // Calculation: For each day before today, count:
+                // 1 Header + 1 Spacer + N Meals + 1 Add Button
+                var scrollTarget = 0
+                for (i in 0 until todayIndex) {
+                    scrollTarget += 1 + 1 + dayPlans[i].meals.size + 1
+                }
+                listState.scrollToItem(scrollTarget)
+            }
         }
-        listState.scrollToItem(todayIndex)
     }
 
     Scaffold(
@@ -95,7 +70,6 @@ fun HomeScreen() {
                     )
                 }
 
-                // Gap between Header and First Item
                 item {
                     Spacer(modifier = Modifier.height(16.dp))
                 }
@@ -104,12 +78,18 @@ fun HomeScreen() {
                     TimelineItem(
                         meal = meal,
                         isFirst = index == 0,
-                        isLast = index == dayPlan.meals.size - 1
+                        isLast = false // It's never the last because "Add" follows
                     )
                 }
                 
-                // No extra spacer here: the TimelineItem's built-in spacer 
-                // now handles the gap to the next header consistently.
+                item {
+                    AddMealItem(
+                        isFirst = dayPlan.meals.isEmpty(),
+                        onAddClick = {
+                            // TODO: Navigate to Entry Screen
+                        }
+                    )
+                }
             }
         }
     }

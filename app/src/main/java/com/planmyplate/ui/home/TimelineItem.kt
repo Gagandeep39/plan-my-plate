@@ -1,10 +1,12 @@
 package com.planmyplate.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -23,7 +25,7 @@ fun TimelineItem(
     isFirst: Boolean = false,
     isLast: Boolean = false
 ) {
-    val dotCenterY = 26.dp // Fixed center for dot to align with first text line
+    val dotCenterY = 26.dp
     val itemGap = 16.dp
 
     Row(
@@ -42,7 +44,6 @@ fun TimelineItem(
         ) {
             val lineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             
-            // Line part above the dot
             if (!isFirst) {
                 Box(
                     modifier = Modifier
@@ -52,18 +53,15 @@ fun TimelineItem(
                 )
             }
             
-            // Line part below the dot (continues through the itemGap if not the last item of the day)
-            if (!isLast) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = dotCenterY)
-                        .width(2.dp)
-                        .fillMaxHeight()
-                        .background(lineColor)
-                )
-            }
+            // Always draw line below if it's a meal (the "Add" button will follow)
+            Box(
+                modifier = Modifier
+                    .padding(top = dotCenterY)
+                    .width(2.dp)
+                    .fillMaxHeight()
+                    .background(lineColor)
+            )
 
-            // The Dot
             val dotSize = 16.dp
             Box(
                 contentAlignment = Alignment.Center,
@@ -88,67 +86,109 @@ fun TimelineItem(
 
         Spacer(modifier = Modifier.width(16.dp))
 
-        // Content Column
         Column(modifier = Modifier.weight(1f)) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 shape = RoundedCornerShape(16.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp, 
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                )
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             ) {
                 Row(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth(),
+                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = meal.formattedTime,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text(text = meal.formattedTime, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = meal.name,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.sp
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = meal.type.name.lowercase().replaceFirstChar { it.uppercase() },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text(text = meal.name, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.sp), color = MaterialTheme.colorScheme.onSurface)
+                        Text(text = meal.type.name.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                        modifier = Modifier.size(40.dp)
-                    ) {
+                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), modifier = Modifier.size(40.dp)) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.Restaurant,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
+                            Icon(imageVector = Icons.Default.Restaurant, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
             }
-            // Vertical spacing between cards
             Spacer(modifier = Modifier.height(itemGap))
+        }
+    }
+}
+
+@Composable
+fun AddMealItem(
+    isFirst: Boolean = false,
+    onAddClick: () -> Unit
+) {
+    val dotCenterY = 26.dp
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .height(IntrinsicSize.Min),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .width(32.dp)
+                .fillMaxHeight(),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            val lineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            
+            // Line part above
+            if (!isFirst) {
+                Box(
+                    modifier = Modifier
+                        .width(2.dp)
+                        .height(dotCenterY)
+                        .background(lineColor)
+                )
+            }
+            
+            // Subtle dot for "Add"
+            Box(
+                modifier = Modifier
+                    .padding(top = dotCenterY - 4.dp)
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.outlineVariant)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Surface(
+                onClick = onAddClick,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.Transparent,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Add Meal",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
