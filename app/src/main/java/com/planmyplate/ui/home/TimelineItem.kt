@@ -3,8 +3,10 @@ package com.planmyplate.ui.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,68 +19,131 @@ import com.planmyplate.model.Meal
 @Composable
 fun TimelineItem(
     meal: Meal,
+    isFirst: Boolean = false,
     isLast: Boolean = false
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 20.dp)
+            .height(IntrinsicSize.Min),
         verticalAlignment = Alignment.Top
     ) {
         // Timeline Column
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.width(40.dp)
+        Box(
+            modifier = Modifier
+                .width(32.dp)
+                .fillMaxHeight(),
+            contentAlignment = Alignment.TopCenter
         ) {
-            // Align dot with the first line of text (time)
-            // 8dp offset usually centers a 12dp dot with a labelMedium text line.
-            Spacer(modifier = Modifier.height(8.dp))
+            val lineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             
-            // Dot
-            Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
-            )
-            
-            // Line
-            if (!isLast) {
+            // Dot is centered at 36dp from top (12dp card padding + 16dp internal + ~8dp text center)
+            val dotCenterY = 36.dp
+            val dotSize = 16.dp
+
+            // Vertical Line logic
+            if (!isFirst) {
                 Box(
                     modifier = Modifier
                         .width(2.dp)
-                        .height(80.dp)
-                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .height(dotCenterY)
+                        .background(lineColor)
+                )
+            }
+            if (!isLast) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = dotCenterY)
+                        .width(2.dp)
+                        .fillMaxHeight()
+                        .background(lineColor)
+                )
+            }
+
+            // The Dot
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .padding(top = dotCenterY - (dotSize / 2))
+                    .size(dotSize)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(dotSize)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                )
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
                 )
             }
         }
 
         Spacer(modifier = Modifier.width(16.dp))
 
-        // Content Column
-        Column(
+        // Card Content
+        Card(
             modifier = Modifier
-                .padding(bottom = 24.dp)
+                .fillMaxWidth()
+                .padding(vertical = 12.dp), // Consistent padding on top AND bottom
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            shape = RoundedCornerShape(16.dp),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp, 
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
         ) {
-            Text(
-                text = meal.formattedTime,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-            Text(
-                text = meal.name,
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
-                ),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = meal.type.name.lowercase().replaceFirstChar { it.uppercase() },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.outline
-            )
+            Row(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = meal.formattedTime,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = meal.name,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = meal.type.name.lowercase().replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Restaurant,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
         }
     }
 }
