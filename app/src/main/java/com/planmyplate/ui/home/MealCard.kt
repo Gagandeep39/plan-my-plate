@@ -20,7 +20,8 @@ import com.planmyplate.model.Meal
 fun MealCard(
     meal: Meal,
     isFirst: Boolean = false,
-    isLast: Boolean = false
+    isLast: Boolean = false,
+    onClick: () -> Unit
 ) {
     val dotCenterY = 26.dp
     val itemGap = 16.dp
@@ -50,7 +51,6 @@ fun MealCard(
                 )
             }
             
-            // Always draw line below if it's a meal (the "Add" button will follow)
             Box(
                 modifier = Modifier
                     .padding(top = dotCenterY)
@@ -85,6 +85,7 @@ fun MealCard(
 
         Column(modifier = Modifier.weight(1f)) {
             Card(
+                onClick = onClick,
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),

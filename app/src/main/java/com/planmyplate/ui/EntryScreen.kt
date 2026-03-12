@@ -28,11 +28,11 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EntryScreen(onBack: () -> Unit) {
+fun EntryScreen(sessionId: Long? = null, onBack: () -> Unit) {
     val context = LocalContext.current
     val database = remember { AppDatabase.getDatabase(context) }
     val viewModel: EntryViewModel = viewModel(
-        factory = EntryViewModelFactory(database.mealDao())
+        factory = EntryViewModelFactory(database.mealDao(), sessionId)
     )
     val uiState by viewModel.uiState.collectAsState()
 
@@ -56,7 +56,7 @@ fun EntryScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Add Meal", fontWeight = FontWeight.Bold) },
+                title = { Text(if (sessionId == null) "Add Meal" else "Edit Meal", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -230,7 +230,7 @@ fun EntryScreen(onBack: () -> Unit) {
                 shape = MaterialTheme.shapes.large,
                 enabled = uiState.dishes.isNotEmpty() || uiState.currentDishName.isNotBlank()
             ) {
-                Text("Schedule Meal", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(if (sessionId == null) "Schedule Meal" else "Update Meal", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
         }
     }

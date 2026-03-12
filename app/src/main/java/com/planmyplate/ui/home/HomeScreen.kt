@@ -15,7 +15,7 @@ import com.planmyplate.ui.TimelineViewModelFactory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onAddMeal: () -> Unit) {
+fun HomeScreen(onAddMeal: () -> Unit, onEditMeal: (Long) -> Unit) {
     val context = LocalContext.current
     val database = remember { AppDatabase.getDatabase(context) }
     val viewModel: TimelineViewModel = viewModel(
@@ -59,7 +59,8 @@ fun HomeScreen(onAddMeal: () -> Unit) {
             dayPlans.forEach { dayPlan ->
                 DailyMealSection(
                     dayPlan = dayPlan,
-                    onAddMealClick = onAddMeal
+                    onAddMealClick = onAddMeal,
+                    onMealClick = onEditMeal
                 )
             }
         }

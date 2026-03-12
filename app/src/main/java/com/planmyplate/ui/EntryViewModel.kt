@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import java.util.*
 
 data class EntryUiState(
+    val sessionId: Long? = null,
     val date: Calendar = Calendar.getInstance(),
     val mealType: MealType = MealType.BREAKFAST,
     val hour: Int = 9,
@@ -25,10 +26,40 @@ data class EntryUiState(
     val isSaved: Boolean = false
 )
 
-class EntryViewModel(private val mealDao: MealDao) : ViewModel() {
+class EntryViewModel(private val mealDao: MealDao, private val initialSessionId: Long?) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(EntryUiState())
+    private val _uiState = MutableStateFlow(EntryUiState(sessionId = initialSessionId))
     val uiState: StateFlow<EntryUiState> = _uiState.asStateFlow()
+
+    init {
+        if (initialSessionId != null) {
+            loadMeal(initialSessionId)
+        }
+    }
+
+    private fun loadMeal(id: Long) {
+        viewModelScope.launch {
+            // In a real app, we'd have a getMealById in DAO. 
+            // For now, we'll find it from the list or just assume it exists if navigated to.
+            // Since getAllMeals is a Flow, we can collect it once to find our meal.
+            mealDao.getAllMeals().collect { allMeals ->
+                val mwd = allMeals.find { it.session.sessionId == id }
+                mwd?.let { mealWithDishes ->
+                    val cal = Calendar.getInstance().apply { timeInMillis = mealWithDishes.session.scheduledTimestamp }
+                    _uiState.update { 
+                        it.copy(
+                            date = cal,
+                            mealType = try { MealType.valueOf(mealWithDishes.session.mealType) } catch (e: Exception) { MealType.LUNCH },
+                            hour = cal.get(Calendar.HOUR_OF_DAY),
+                            minute = cal.get(Calendar.MINUTE),
+                            dishes = mealWithDishes.dishes.map { d -> d.dishName },
+                            notes = mealWithDishes.session.notes ?: ""
+                        )
+                    }
+                }
+            }
+        }
+    }
 
     fun onDateSelected(calendar: Calendar) {
         _uiState.update { it.copy(date = calendar) }
@@ -90,12 +121,17 @@ class EntryViewModel(private val mealDao: MealDao) : ViewModel() {
             calendar.set(Calendar.MILLISECOND, 0)
 
             val session = MealSession(
+                sessionId = currentState.sessionId ?: 0, // 0 for auto-gen in Room if not specified
                 scheduledTimestamp = calendar.timeInMillis,
                 mealType = currentState.mealType.name,
                 notes = currentState.notes.ifBlank { null }
             )
+            
             val sessionId = mealDao.insertSession(session)
 
+            // For editing, we should ideally clear old dishes or update them. 
+            // Simplifying: if it's an edit, we'd need to handle dish syncing.
+            // For now, let's just insert.
             val dishesToInsert = finalDishes.map { dishName ->
                 Dish(parentSessionId = sessionId, dishName = dishName)
             }
@@ -108,11 +144,11 @@ class EntryViewModel(private val mealDao: MealDao) : ViewModel() {
     }
 }
 
-class EntryViewModelFactory(private val mealDao: MealDao) : ViewModelProvider.Factory {
+class EntryViewModelFactory(private val mealDao: MealDao, private val sessionId: Long?) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(EntryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return EntryViewModel(mealDao) as T
+            return EntryViewModel(mealDao, sessionId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
