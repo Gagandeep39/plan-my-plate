@@ -1,5 +1,6 @@
 package com.planmyplate.ui.mealform
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -247,17 +248,22 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                                     Icon(
                                         Icons.Default.Close, 
                                         contentDescription = "Remove",
-                                        tint = MaterialTheme.colorScheme.primary
+                                        tint = MaterialTheme.colorScheme.outline
                                     )
                                 }
                             },
                             colors = ListItemDefaults.colors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
+                                containerColor = MaterialTheme.colorScheme.surface,
                                 headlineColor = MaterialTheme.colorScheme.onSurface
                             ),
                             modifier = Modifier
-                                .padding(vertical = 2.dp)
-                                .clip(RoundedCornerShape(8.dp))
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
                         )
                     }
                 }
