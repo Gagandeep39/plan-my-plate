@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.planmyplate.PlanMyPlateApp
 import com.planmyplate.model.MealType
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -61,6 +62,9 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showMealTypeMenu by remember { mutableStateOf(false) }
 
+    // State to track if an item was recently added manually
+    var itemAddedTrigger by remember { mutableIntStateOf(0) }
+
     // Consistent lighter border color
     val fieldColors = OutlinedTextFieldDefaults.colors(
         unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
@@ -76,8 +80,11 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
         }
     }
 
-    LaunchedEffect(uiState.dishes.size) {
-        if (uiState.dishes.isNotEmpty()) {
+    // Auto-scroll ONLY when itemAddedTrigger changes (manually adding a dish)
+    LaunchedEffect(itemAddedTrigger) {
+        if (itemAddedTrigger > 0) {
+            // Delay slightly to allow the new item to be rendered before scrolling
+            delay(100)
             scrollState.animateScrollTo(scrollState.maxValue)
         }
     }
@@ -201,7 +208,10 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                     },
                     trailingIcon = {
                         if (uiState.currentDishName.isNotBlank()) {
-                            IconButton(onClick = { viewModel.addDish() }) {
+                            IconButton(onClick = { 
+                                viewModel.addDish()
+                                itemAddedTrigger++
+                            }) {
                                 Icon(
                                     Icons.Default.Add, 
                                     contentDescription = "Add Dish",
@@ -221,6 +231,7 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                         onDone = { 
                             if (uiState.currentDishName.isNotBlank()) {
                                 viewModel.addDish()
+                                itemAddedTrigger++
                             }
                         }
                     )
