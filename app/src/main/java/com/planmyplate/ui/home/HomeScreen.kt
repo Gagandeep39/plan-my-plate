@@ -33,18 +33,7 @@ fun HomeScreen(
         factory = TimelineViewModelFactory(app.mealRepository)
     )
     
-    val rawDayPlans by viewModel.timelineState.collectAsState()
-    val dayPlans = remember(rawDayPlans) {
-        val todayIndex = rawDayPlans.indexOfFirst { it.isToday }
-        if (todayIndex > 0) {
-            val mutable = rawDayPlans.toMutableList()
-            val today = mutable.removeAt(todayIndex)
-            mutable.add(0, today)
-            mutable.toList()
-        } else {
-            rawDayPlans
-        }
-    }
+    val dayPlans by viewModel.timelineState.collectAsState()
     val selectedMealIds by viewModel.selectedMealIds.collectAsState()
     val listState = rememberLazyListState()
 
@@ -66,11 +55,11 @@ fun HomeScreen(
             if (todayIndex != -1) {
                 var scrollTarget = 0
                 for (i in 0 until todayIndex) {
-                    scrollTarget += 1 + 1 + dayPlans[i].meals.size + 1
+                    // Each DailyMealSection adds: 1 (stickyHeader) + meals.size + 1 (AddMealCard)
+                    scrollTarget += 1 + dayPlans[i].meals.size + 1
                 }
                 listState.scrollToItem(scrollTarget)
             }
-            // Small delay to ensure the scroll has settled before revealing
             isReadyToShow = true
         }
     }

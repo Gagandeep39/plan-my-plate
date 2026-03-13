@@ -117,13 +117,6 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
             genCalendar.add(Calendar.DAY_OF_YEAR, 1)
         }
 
-        // Sort: Today always at the top
-        val todayIndex = fullTimeline.indexOfFirst { it.isToday }
-        if (todayIndex > 0) {
-            val today = fullTimeline.removeAt(todayIndex)
-            fullTimeline.add(0, today)
-        }
-
         return fullTimeline
     }
 }
