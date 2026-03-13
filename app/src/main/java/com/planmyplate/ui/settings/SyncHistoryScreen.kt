@@ -34,9 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
 import java.util.Locale
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -45,6 +42,7 @@ import androidx.lifecycle.viewModelScope
 import com.planmyplate.PlanMyPlateApp
 import com.planmyplate.data.repository.SyncLogRepository
 import com.planmyplate.model.SyncLog
+import com.planmyplate.util.DatePickerMapper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -82,22 +80,6 @@ class SyncHistoryViewModelFactory(
     }
 }
 
-private fun startOfDay(millis: Long): Long {
-    return Calendar.getInstance().apply {
-        timeInMillis = millis
-        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-    }.timeInMillis
-}
-
-private fun endOfDay(millis: Long): Long {
-    return Calendar.getInstance().apply {
-        timeInMillis = millis
-        set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59)
-        set(Calendar.SECOND, 59); set(Calendar.MILLISECOND, 999)
-    }.timeInMillis
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SyncHistoryScreen(onBack: () -> Unit) {
@@ -110,16 +92,18 @@ fun SyncHistoryScreen(onBack: () -> Unit) {
     val uiState by viewModel.uiState.collectAsState()
 
     var showDatePicker by remember { mutableStateOf(false) }
-    var selectedDayMillis by remember { mutableStateOf(startOfDay(System.currentTimeMillis())) }
-    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
+    var selectedDateKey by remember { mutableStateOf(DatePickerMapper.localMillisToDateKey(System.currentTimeMillis())) }
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = DatePickerMapper.dateKeyToPickerUtcMidnightMillis(selectedDateKey)
+    )
 
-    val dateLabel = remember(selectedDayMillis) {
-        SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(selectedDayMillis))
+    val dateLabel = remember(selectedDateKey) {
+        DatePickerMapper.dateKeyToDisplayLabel(selectedDateKey)
     }
-    val filteredLogs = remember(uiState.syncLogs, selectedDayMillis) {
-        val start = startOfDay(selectedDayMillis)
-        val end = endOfDay(selectedDayMillis)
-        uiState.syncLogs.filter { it.createdAt in start..end }
+    val filteredLogs = remember(uiState.syncLogs, selectedDateKey) {
+        uiState.syncLogs.filter {
+            DatePickerMapper.localMillisToDateKey(it.createdAt) == selectedDateKey
+        }
     }
 
     if (showDatePicker) {
@@ -127,7 +111,9 @@ fun SyncHistoryScreen(onBack: () -> Unit) {
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { selectedDayMillis = startOfDay(it) }
+                    datePickerState.selectedDateMillis?.let {
+                        selectedDateKey = DatePickerMapper.pickerUtcMillisToDateKey(it)
+                    }
                     showDatePicker = false
                 }) { Text("OK") }
             },

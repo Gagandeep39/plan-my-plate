@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.planmyplate.PlanMyPlateApp
 import com.planmyplate.model.MealType
+import com.planmyplate.util.DatePickerMapper
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
@@ -51,7 +52,7 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
     
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = uiState.date.timeInMillis
+        initialSelectedDateMillis = DatePickerMapper.localCalendarToPickerUtcMidnightMillis(uiState.date)
     )
 
     var showTimePicker by remember { mutableStateOf(false) }
@@ -404,17 +405,7 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { utcMillis ->
-                        val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
-                            timeInMillis = utcMillis
-                        }
-                        
-                        val localCal = Calendar.getInstance().apply {
-                            set(Calendar.YEAR, utcCal.get(Calendar.YEAR))
-                            set(Calendar.MONTH, utcCal.get(Calendar.MONTH))
-                            set(Calendar.DAY_OF_MONTH, utcCal.get(Calendar.DAY_OF_MONTH))
-                        }
-                        
-                        viewModel.onDateSelected(localCal)
+                        viewModel.onDateSelected(DatePickerMapper.pickerUtcMillisToLocalCalendar(utcMillis))
                     }
                     showDatePicker = false
                 }) { Text("OK") }
