@@ -10,15 +10,18 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.planmyplate.PlanMyPlateApp
+import com.planmyplate.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,6 +87,16 @@ fun HomeScreen(
                             IconButton(onClick = { viewModel.clearSelection() }) {
                                 Icon(Icons.Default.Close, contentDescription = "Clear Selection")
                             }
+                        } else {
+                            // Logo in the navigation icon slot to keep it in the left corner
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .padding(start = 8.dp)
+                                    .size(48.dp),
+                                tint = Color.Unspecified
+                            )
                         }
                     },
                     actions = {
@@ -97,7 +110,7 @@ fun HomeScreen(
                             }
                         }
                     },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Transparent
                     )
                 )
