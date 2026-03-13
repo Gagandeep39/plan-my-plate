@@ -58,10 +58,22 @@ class SettingsViewModel(
             }
         }
         viewModelScope.launch {
+            userRepository.sharableLink.collect { link ->
+                _uiState.update { it.copy(sharableLink = link) }
+            }
+        }
+        viewModelScope.launch {
             userRepository.isDriveAuthorized.collect { authorized ->
                 _uiState.update { it.copy(isDriveConnected = authorized) }
                 if (authorized) {
-                    refreshDriveLink()
+                    if (userRepository.sharableLink.value == null) {
+                        // No cached link — fetch for the first time (shows loading UI)
+                        refreshDriveLink()
+                    } else {
+                        // Cached link exists — show it immediately, then silently verify
+                        // the file still exists on Drive (handles external deletion)
+                        silentlyVerifyDriveLink()
+                    }
                 }
             }
         }
@@ -155,13 +167,26 @@ class SettingsViewModel(
         }
     }
 
+    // Verifies the Drive file still exists without touching the loading UI.
+    // If the file was deleted externally, it gets re-created and the cache is updated.
+    // On network failure we keep the cached link — it may still be valid.
+    private fun silentlyVerifyDriveLink() {
+        viewModelScope.launch {
+            val freshLink = driveRepository.createOrGetSharableJsonFile()
+            if (freshLink != null && freshLink != userRepository.sharableLink.value) {
+                userRepository.saveSharableLink(freshLink)
+            }
+        }
+    }
+
     fun refreshDriveLink() {
         if (_uiState.value.isLoadingLink) return
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingLink = true, error = null) }
             val link = driveRepository.createOrGetSharableJsonFile()
             if (link != null) {
-                _uiState.update { it.copy(sharableLink = link, isLoadingLink = false) }
+                userRepository.saveSharableLink(link)
+                _uiState.update { it.copy(isLoadingLink = false) }
             } else {
                 _uiState.update { it.copy(isLoadingLink = false, error = "Could not load Drive link. Tap retry to try again.") }
             }
@@ -174,7 +199,7 @@ class SettingsViewModel(
 
     fun disconnectDrive() {
         userRepository.setDriveAuthorized(false)
-        _uiState.update { it.copy(sharableLink = null) }
+        userRepository.clearSharableLink()
     }
 
     fun disconnectGoogle(onDone: () -> Unit) {

@@ -19,6 +19,9 @@ class UserRepository(private val context: Context) {
     private val _isDriveAuthorized = MutableStateFlow(sharedPrefs.getBoolean("drive_authorized", false))
     val isDriveAuthorized: StateFlow<Boolean> = _isDriveAuthorized.asStateFlow()
 
+    private val _sharableLink = MutableStateFlow(sharedPrefs.getString("drive_sharable_link", null))
+    val sharableLink: StateFlow<String?> = _sharableLink.asStateFlow()
+
     fun saveUser(email: String) {
         sharedPrefs.edit().putString("user_email", email).apply()
         _userEmail.value = email
@@ -34,12 +37,23 @@ class UserRepository(private val context: Context) {
         _isDriveAuthorized.value = authorized
     }
 
+    fun saveSharableLink(link: String) {
+        sharedPrefs.edit().putString("drive_sharable_link", link).apply()
+        _sharableLink.value = link
+    }
+
+    fun clearSharableLink() {
+        sharedPrefs.edit().remove("drive_sharable_link").apply()
+        _sharableLink.value = null
+    }
+
     suspend fun logout() {
         // Clear local state immediately so the UI updates right away
         sharedPrefs.edit().clear().apply()
         _userEmail.value = null
         _isCalendarAuthorized.value = false
         _isDriveAuthorized.value = false
+        _sharableLink.value = null
         // Credential manager clear is slow — run it after UI state is already updated
         val credentialManager = CredentialManager.create(context)
         credentialManager.clearCredentialState(ClearCredentialStateRequest())
