@@ -85,6 +85,10 @@ fun AppNavigation() {
                 onRestoreComplete = {
                     // Recreate the activity so Room re-opens against the restored DB file
                     activity?.recreate()
+                    // Also navigate away from sync_check to avoid reload loop
+                    navController.navigate("timeline") {
+                        popUpTo("sync_check") { inclusive = true }
+                    }
                 }
             )
         }

@@ -66,15 +66,22 @@ class UserRepository(private val context: Context) {
         sharedPrefs.edit().putBoolean(KEY_DRIVE_AUTHORIZED, authorized).apply()
         _isDriveAuthorized.value = authorized
         if (!authorized) {
+            sharedPrefs.edit()
+                .remove(KEY_DB_SYNC_ENABLED)
+                .remove(KEY_DRIVE_SHARABLE_LINK)
+                .apply()
+            _isDbSyncEnabled.value = false
+            _sharableLink.value = null
             WorkManager.getInstance(context).cancelAllWorkByTag(DriveExportWorker.DRIVE_EXPORT_WORK_TAG)
             WorkManager.getInstance(context).cancelAllWorkByTag(DriveDbSyncWorker.DRIVE_DB_SYNC_WORK_TAG)
         }
     }
 
     fun setDbSyncEnabled(enabled: Boolean) {
-        sharedPrefs.edit().putBoolean(KEY_DB_SYNC_ENABLED, enabled).apply()
-        _isDbSyncEnabled.value = enabled
-        if (!enabled) {
+        val effectiveEnabled = enabled && _isDriveAuthorized.value
+        sharedPrefs.edit().putBoolean(KEY_DB_SYNC_ENABLED, effectiveEnabled).apply()
+        _isDbSyncEnabled.value = effectiveEnabled
+        if (!effectiveEnabled) {
             WorkManager.getInstance(context).cancelAllWorkByTag(DriveDbSyncWorker.DRIVE_DB_SYNC_WORK_TAG)
         }
     }
@@ -125,8 +132,17 @@ class UserRepository(private val context: Context) {
     }
 
     suspend fun logout() {
-        // Clear local state immediately so the UI updates right away
-        sharedPrefs.edit().clear().apply()
+        // Remove only relevant keys for a clean reset
+        sharedPrefs.edit()
+            .remove(KEY_USER_EMAIL)
+            .remove(KEY_CALENDAR_AUTHORIZED)
+            .remove(KEY_DRIVE_AUTHORIZED)
+            .remove(KEY_DRIVE_SHARABLE_LINK)
+            .remove(KEY_DB_SYNC_ENABLED)
+            .remove(KEY_DB_LAST_SYNC_TIMESTAMP)
+            .remove(KEY_DB_LAST_UPLOAD_TIMESTAMP)
+            .remove(KEY_DB_LAST_WRITE_TIMESTAMP)
+            .apply()
         _userEmail.value = null
         _isCalendarAuthorized.value = false
         _isDriveAuthorized.value = false
