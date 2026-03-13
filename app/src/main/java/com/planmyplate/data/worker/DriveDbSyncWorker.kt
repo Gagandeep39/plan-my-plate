@@ -109,6 +109,19 @@ class DriveDbSyncWorker(
             // Flush any pending WAL writes so the main DB file is complete
             database.query(androidx.sqlite.db.SimpleSQLiteQuery("PRAGMA wal_checkpoint(TRUNCATE)")).close()
 
+            // Never overwrite a good backup with an empty database
+            val mealCount = database.mealDao().getMealCount()
+            if (mealCount == 0) {
+                syncLogRepo.log(
+                    service = SyncLog.SERVICE_DRIVE,
+                    action = "Backup database",
+                    status = SyncLog.STATUS_SKIPPED,
+                    source = SyncLog.SOURCE_QUEUE,
+                    message = "Skipped: local database is empty"
+                )
+                return Result.success()
+            }
+
             // Copy the DB file to cache before uploading
             val dbFile = applicationContext.getDatabasePath("plan_my_plate_db")
             val cacheFile = File(applicationContext.cacheDir, "plan_my_plate_backup.db")
@@ -117,8 +130,10 @@ class DriveDbSyncWorker(
             val success = DriveRepository(applicationContext).uploadDatabaseBackup()
 
             if (success) {
+                val now = System.currentTimeMillis()
                 prefs.edit()
-                    .putLong(UserRepository.KEY_DB_LAST_SYNC_TIMESTAMP, System.currentTimeMillis())
+                    .putLong(UserRepository.KEY_DB_LAST_SYNC_TIMESTAMP, now)
+                    .putLong(UserRepository.KEY_DB_LAST_UPLOAD_TIMESTAMP, now)
                     .apply()
                 Result.success()
             } else {

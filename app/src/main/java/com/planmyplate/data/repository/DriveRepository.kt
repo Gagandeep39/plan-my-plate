@@ -10,6 +10,7 @@ import com.google.api.services.drive.DriveScopes
 import com.google.api.services.drive.model.File
 import com.google.api.services.drive.model.Permission
 import com.planmyplate.data.AppDatabase
+import java.io.FileOutputStream
 import com.planmyplate.model.MealWithDishes
 import com.planmyplate.model.SyncLog
 import kotlinx.coroutines.Dispatchers
@@ -46,20 +47,28 @@ class DriveRepository(private val context: Context) {
     }
 
     private fun getDriveService(): Drive? {
-        val sharedPrefs = context.getSharedPreferences(UserRepository.PREFS_NAME, Context.MODE_PRIVATE)
-        val userEmail = sharedPrefs.getString(UserRepository.KEY_USER_EMAIL, null) ?: return null
+        return try {
+            val sharedPrefs = context.getSharedPreferences(UserRepository.PREFS_NAME, Context.MODE_PRIVATE)
+            val userEmail = sharedPrefs
+                .getString(UserRepository.KEY_USER_EMAIL, null)
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?: return null
 
-        val credential = GoogleAccountCredential.usingOAuth2(
-            context, Collections.singleton(DriveScopes.DRIVE_FILE)
-        ).apply {
-            selectedAccountName = userEmail
+            val credential = GoogleAccountCredential.usingOAuth2(
+                context, Collections.singleton(DriveScopes.DRIVE_FILE)
+            ).apply {
+                selectedAccountName = userEmail
+            }
+
+            Drive.Builder(
+                NetHttpTransport(),
+                GsonFactory.getDefaultInstance(),
+                credential
+            ).setApplicationName("Plan My Plate").build()
+        } catch (_: Exception) {
+            null
         }
-
-        return Drive.Builder(
-            NetHttpTransport(),
-            GsonFactory.getDefaultInstance(),
-            credential
-        ).setApplicationName("Plan My Plate").build()
     }
 
     private fun findExistingJsonFileId(service: Drive): String? {
@@ -134,7 +143,16 @@ class DriveRepository(private val context: Context) {
     }
 
     suspend fun createOrGetSharableJsonFile(source: String = SyncLog.SOURCE_DIRECT): String? = withContext(Dispatchers.IO) {
-        val service = getDriveService() ?: return@withContext null
+        val service = getDriveService()
+        if (service == null) {
+            insertSyncLog(
+                action = "Prepare shareable link",
+                status = SyncLog.STATUS_FAILURE,
+                source = source,
+                message = "Drive account is not connected"
+            )
+            return@withContext null
+        }
         
         try {
             val fileId = ensureJsonFileExists(service)
@@ -173,7 +191,16 @@ class DriveRepository(private val context: Context) {
         meals: List<MealWithDishes>,
         source: String = SyncLog.SOURCE_QUEUE
     ): String? = withContext(Dispatchers.IO) {
-        val service = getDriveService() ?: return@withContext null
+        val service = getDriveService()
+        if (service == null) {
+            insertSyncLog(
+                action = "Export JSON snapshot",
+                status = SyncLog.STATUS_FAILURE,
+                source = source,
+                message = "Drive account is not connected"
+            )
+            return@withContext null
+        }
 
         try {
             val fileId = ensureJsonFileExists(service) ?: return@withContext null
@@ -207,12 +234,95 @@ class DriveRepository(private val context: Context) {
         }
     }
 
+    data class CloudBackupInfo(val fileId: String, val modifiedTimeMs: Long, val sizeBytes: Long)
+
+    /**
+     * Fetches the Drive backup file's id, modifiedTime, and size without downloading content.
+     * Returns null if no backup file exists or Drive is unavailable.
+     */
+    suspend fun getCloudBackupInfo(): CloudBackupInfo? = withContext(Dispatchers.IO) {
+        val service = getDriveService() ?: return@withContext null
+        try {
+            val query = "name = 'plan_my_plate_backup.db' and trashed = false"
+            val file = service.files().list()
+                .setQ(query)
+                .setFields("files(id, modifiedTime, size)")
+                .execute()
+                .files
+                ?.firstOrNull() ?: return@withContext null
+
+            val modifiedMs = file.modifiedTime?.value ?: return@withContext null
+            val sizeBytes = file.getSize() ?: 0L
+            CloudBackupInfo(fileId = file.id, modifiedTimeMs = modifiedMs, sizeBytes = sizeBytes)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Downloads the Drive backup file to [targetFile].
+     * Returns true on success.
+     */
+    suspend fun downloadDatabaseBackup(targetFile: java.io.File, source: String = SyncLog.SOURCE_DIRECT): Boolean = withContext(Dispatchers.IO) {
+        val service = getDriveService()
+        if (service == null) {
+            insertSyncLog(
+                action = "Restore database",
+                status = SyncLog.STATUS_FAILURE,
+                source = source,
+                message = "Drive account is not connected"
+            )
+            return@withContext false
+        }
+        try {
+            val query = "name = 'plan_my_plate_backup.db' and trashed = false"
+            val fileId = service.files().list()
+                .setQ(query)
+                .setFields("files(id)")
+                .execute()
+                .files
+                ?.firstOrNull()
+                ?.id ?: return@withContext false
+
+            targetFile.parentFile?.mkdirs()
+            FileOutputStream(targetFile).use { out ->
+                service.files().get(fileId).executeMediaAndDownloadTo(out)
+            }
+
+            val sizeKb = targetFile.length() / 1024
+            insertSyncLog(
+                action = "Restore database",
+                status = SyncLog.STATUS_SUCCESS,
+                source = source,
+                message = "Database restored from Drive (${sizeKb}KB)"
+            )
+            true
+        } catch (e: Exception) {
+            insertSyncLog(
+                action = "Restore database",
+                status = SyncLog.STATUS_FAILURE,
+                source = source,
+                message = e.message ?: "Download failed"
+            )
+            false
+        }
+    }
+
     /**
      * Uploads the pre-copied SQLite DB file (from cache) to Google Drive.
      * The worker is responsible for WAL checkpoint + file copy before calling this.
      */
     suspend fun uploadDatabaseBackup(source: String = SyncLog.SOURCE_QUEUE): Boolean = withContext(Dispatchers.IO) {
-        val service = getDriveService() ?: return@withContext false
+        val service = getDriveService()
+        if (service == null) {
+            insertSyncLog(
+                action = "Backup database",
+                status = SyncLog.STATUS_FAILURE,
+                source = source,
+                message = "Drive account is not connected"
+            )
+            return@withContext false
+        }
 
         try {
             val cacheFile = java.io.File(context.cacheDir, "plan_my_plate_backup.db")
@@ -226,7 +336,6 @@ class DriveRepository(private val context: Context) {
                 return@withContext false
             }
 
-            // Find an existing backup file on Drive (scoped to this app via DRIVE_FILE)
             val query = "name = 'plan_my_plate_backup.db' and trashed = false"
             val existingId = service.files().list()
                 .setQ(query)

@@ -41,4 +41,7 @@ interface MealDao {
 
     @Query("DELETE FROM dishes WHERE parentSessionId = :sessionId")
     suspend fun deleteDishesForSession(sessionId: Long)
+
+    @Query("SELECT COUNT(*) FROM meal_sessions")
+    suspend fun getMealCount(): Int
 }

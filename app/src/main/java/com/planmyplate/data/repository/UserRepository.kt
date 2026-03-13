@@ -19,6 +19,8 @@ class UserRepository(private val context: Context) {
         const val KEY_DRIVE_SHARABLE_LINK = "drive_sharable_link"
         const val KEY_DB_SYNC_ENABLED = "db_sync_enabled"
         const val KEY_DB_LAST_SYNC_TIMESTAMP = "db_last_sync_timestamp"
+        const val KEY_DB_LAST_UPLOAD_TIMESTAMP = "db_last_upload_timestamp"
+        const val KEY_DB_LAST_WRITE_TIMESTAMP = "db_last_write_timestamp"
     }
 
     private val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -73,6 +75,25 @@ class UserRepository(private val context: Context) {
         if (!_isDriveAuthorized.value || !_isDbSyncEnabled.value) return
         DriveDbSyncWorker.enqueue(context)
     }
+
+    fun markLocalWrite() {
+        sharedPrefs.edit()
+            .putLong(KEY_DB_LAST_WRITE_TIMESTAMP, System.currentTimeMillis())
+            .apply()
+    }
+
+    fun recordUploadTimestamp(ts: Long = System.currentTimeMillis()) {
+        sharedPrefs.edit()
+            .putLong(KEY_DB_LAST_UPLOAD_TIMESTAMP, ts)
+            .putLong(KEY_DB_LAST_SYNC_TIMESTAMP, ts) // keep legacy key in sync
+            .apply()
+    }
+
+    fun getLastUploadTimestamp(): Long =
+        sharedPrefs.getLong(KEY_DB_LAST_UPLOAD_TIMESTAMP, 0L)
+
+    fun getLastWriteTimestamp(): Long =
+        sharedPrefs.getLong(KEY_DB_LAST_WRITE_TIMESTAMP, 0L)
 
     /** Force-enqueues a DB backup, bypassing cooldown. Requires Drive authorised + toggle on. */
     fun enqueueDbSyncForced() {

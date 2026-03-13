@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -20,6 +21,7 @@ import com.planmyplate.ui.navigation.NavTransitions
 import com.planmyplate.ui.settings.SettingsScreen
 import com.planmyplate.ui.settings.SyncHistoryScreen
 import com.planmyplate.ui.theme.PlanMyPlateTheme
+import com.planmyplate.ui.sync.SyncCheckScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,7 +55,7 @@ fun AppNavigation() {
     val navController = rememberNavController()
     NavHost(
         navController = navController, 
-        startDestination = "timeline",
+        startDestination = "sync_check",
         enterTransition = NavTransitions.enterTransition,
         exitTransition = NavTransitions.exitTransition,
         popEnterTransition = NavTransitions.popEnterTransition,
@@ -69,6 +71,20 @@ fun AppNavigation() {
                 },
                 onOpenSettings = {
                     navController.navigate("settings")
+                }
+            )
+        }
+        composable("sync_check") {
+            val activity = (LocalContext.current as? android.app.Activity)
+            SyncCheckScreen(
+                onClear = {
+                    navController.navigate("timeline") {
+                        popUpTo("sync_check") { inclusive = true }
+                    }
+                },
+                onRestoreComplete = {
+                    // Recreate the activity so Room re-opens against the restored DB file
+                    activity?.recreate()
                 }
             )
         }

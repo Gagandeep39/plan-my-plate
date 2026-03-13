@@ -32,5 +32,13 @@ abstract class AppDatabase : RoomDatabase() {
                 instance
             }
         }
+
+        /** Closes the current DB instance so it can be replaced with a restored file. */
+        fun closeAndReset() {
+            synchronized(this) {
+                INSTANCE?.close()
+                INSTANCE = null
+            }
+        }
     }
 }

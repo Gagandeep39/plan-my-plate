@@ -33,6 +33,13 @@ class MealRepository(
         DriveExportWorker.enqueue(context)
     }
 
+    private fun markLocalWrite() {
+        context.getSharedPreferences(UserRepository.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putLong(UserRepository.KEY_DB_LAST_WRITE_TIMESTAMP, System.currentTimeMillis())
+            .apply()
+    }
+
     fun getAllMeals(): Flow<List<MealWithDishes>> = mealDao.getAllMeals()
 
     suspend fun saveMeal(session: MealSession, dishes: List<String>): Long {
@@ -51,6 +58,7 @@ class MealRepository(
             scheduleCalendarSync(sessionId)
         }
 
+        markLocalWrite()
         scheduleDriveExportSync()
 
         return sessionId
@@ -85,6 +93,7 @@ class MealRepository(
         mealDao.deleteDishesForSession(session.sessionId)
         mealDao.deleteCalendarMapping(session.sessionId)
         mealDao.deleteSession(session)
+        markLocalWrite()
         scheduleDriveExportSync()
     }
 
