@@ -31,7 +31,7 @@ data class SettingsUiState(
     val isSyncing: Boolean = false
 )
 
-private enum class AuthStep { SIGN_IN, DRIVE_ONLY }
+private enum class AuthStep { SIGN_IN, CALENDAR_ONLY, DRIVE_ONLY }
 
 class SettingsViewModel(private val userRepository: UserRepository) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -59,7 +59,7 @@ class SettingsViewModel(private val userRepository: UserRepository) : ViewModel(
         }
     }
 
-    fun signIn(context: Context, onAuthResolutionRequired: (android.app.PendingIntent) -> Unit) {
+    fun signIn(context: Context) {
         val credentialManager = CredentialManager.create(context)
         val serverClientId = "468906434207-oj1asrjtq2htvbch6dls24vg4an7gs6g.apps.googleusercontent.com"
 
@@ -81,8 +81,6 @@ class SettingsViewModel(private val userRepository: UserRepository) : ViewModel(
                 if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                     userRepository.saveUser(googleIdTokenCredential.id)
-                    // Request Calendar authorization by default after sign-in
-                    requestCalendarAuthorization(context, onAuthResolutionRequired)
                 }
             } catch (e: GetCredentialException) {
                 Log.e("SettingsViewModel", "Credential Manager error", e)
@@ -91,10 +89,10 @@ class SettingsViewModel(private val userRepository: UserRepository) : ViewModel(
         }
     }
 
-    private fun requestCalendarAuthorization(context: Context, onResolutionRequired: (android.app.PendingIntent) -> Unit) {
-        currentAuthStep = AuthStep.SIGN_IN
+    fun connectCalendar(context: Context, onResolutionRequired: (android.app.PendingIntent) -> Unit) {
+        currentAuthStep = AuthStep.CALENDAR_ONLY
         val authorizationRequest = AuthorizationRequest.builder()
-            .setRequestedScopes(listOf(calendarScope, driveScope))
+            .setRequestedScopes(listOf(calendarScope))
             .build()
 
         Identity.getAuthorizationClient(context)
@@ -104,13 +102,20 @@ class SettingsViewModel(private val userRepository: UserRepository) : ViewModel(
                     authorizationResult.pendingIntent?.let { onResolutionRequired(it) }
                 } else {
                     userRepository.setCalendarAuthorized(true)
-                    userRepository.setDriveAuthorized(true)
                 }
             }
             .addOnFailureListener { e ->
-                Log.e("SettingsViewModel", "Authorization failed", e)
+                Log.e("SettingsViewModel", "Calendar authorization failed", e)
                 _uiState.update { it.copy(error = "Calendar access denied") }
             }
+    }
+
+    fun disconnectCalendar() {
+        userRepository.setCalendarAuthorized(false)
+    }
+
+    fun disconnectDrive() {
+        userRepository.setDriveAuthorized(false)
     }
 
     fun connectDrive(context: Context, onResolutionRequired: (android.app.PendingIntent) -> Unit) {
@@ -137,13 +142,9 @@ class SettingsViewModel(private val userRepository: UserRepository) : ViewModel(
     fun handleAuthorizationResult(success: Boolean) {
         if (success) {
             when (currentAuthStep) {
-                AuthStep.SIGN_IN -> {
-                    userRepository.setCalendarAuthorized(true)
-                    userRepository.setDriveAuthorized(true)
-                }
-                AuthStep.DRIVE_ONLY -> {
-                    userRepository.setDriveAuthorized(true)
-                }
+                AuthStep.CALENDAR_ONLY -> userRepository.setCalendarAuthorized(true)
+                AuthStep.DRIVE_ONLY -> userRepository.setDriveAuthorized(true)
+                else -> {}
             }
         } else {
             _uiState.update { it.copy(error = "Authorization cancelled or failed") }

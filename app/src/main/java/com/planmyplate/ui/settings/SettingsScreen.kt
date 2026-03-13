@@ -99,11 +99,7 @@ fun SettingsScreen(onBack: () -> Unit) {
 
                     if (uiState.userEmail == null) {
                         Button(
-                            onClick = { 
-                                viewModel.signIn(context) { pendingIntent ->
-                                    authLauncher.launch(IntentSenderRequest.Builder(pendingIntent).build())
-                                }
-                            },
+                            onClick = { viewModel.signIn(context) },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(Icons.Default.Sync, contentDescription = null)
@@ -131,10 +127,11 @@ fun SettingsScreen(onBack: () -> Unit) {
                     description = "Sync meals to your personal calendar",
                     isConnected = uiState.isGoogleConnected,
                     onConnect = {
-                        viewModel.signIn(context) { pendingIntent ->
+                        viewModel.connectCalendar(context) { pendingIntent ->
                             authLauncher.launch(IntentSenderRequest.Builder(pendingIntent).build())
                         }
-                    }
+                    },
+                    onDisconnect = { viewModel.disconnectCalendar() }
                 )
 
                 // Google Drive Service
@@ -146,7 +143,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                         viewModel.connectDrive(context) { pendingIntent ->
                             authLauncher.launch(IntentSenderRequest.Builder(pendingIntent).build())
                         }
-                    }
+                    },
+                    onDisconnect = { viewModel.disconnectDrive() }
                 )
             }
 
@@ -182,7 +180,8 @@ fun ServiceCard(
     title: String,
     description: String,
     isConnected: Boolean,
-    onConnect: () -> Unit
+    onConnect: () -> Unit,
+    onDisconnect: () -> Unit
 ) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth()
@@ -202,7 +201,12 @@ fun ServiceCard(
                 Text(description, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             }
             if (isConnected) {
-                Icon(Icons.Default.CheckCircle, contentDescription = "Enabled", tint = Color(0xFF4CAF50))
+                TextButton(
+                    onClick = onDisconnect,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Disable")
+                }
             } else {
                 TextButton(onClick = onConnect) {
                     Text("Enable")
