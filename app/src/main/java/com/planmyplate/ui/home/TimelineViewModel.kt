@@ -8,15 +8,16 @@ import com.planmyplate.model.DayPlan
 import com.planmyplate.model.Meal
 import com.planmyplate.model.MealType
 import com.planmyplate.model.MealWithDishes
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -26,6 +27,10 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
     val selectedMealIds: StateFlow<Set<String>> = _selectedMealIds.asStateFlow()
 
     private val _allMealsWithDishes = MutableStateFlow<List<MealWithDishes>>(emptyList())
+
+    // Cache formats to avoid expensive re-allocation
+    private val dateFormat = SimpleDateFormat("EEEE, MMMM dd", Locale.getDefault())
+    private val isoFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
     init {
         viewModelScope.launch {
@@ -37,7 +42,10 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
 
     val timelineState: StateFlow<List<DayPlan>> = _allMealsWithDishes
         .map { mealsWithDishes ->
-            generateTimeline(mealsWithDishes)
+            // Move heavy computation to Default dispatcher to keep UI thread free
+            withContext(Dispatchers.Default) {
+                generateTimeline(mealsWithDishes)
+            }
         }
         .stateIn(
             scope = viewModelScope,
@@ -68,15 +76,13 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
     }
 
     private fun generateTimeline(mealsWithDishes: List<MealWithDishes>): List<DayPlan> {
-        val dateFormat = SimpleDateFormat("EEEE, MMMM dd", Locale.getDefault())
-        val isoFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        
         val todayCalendar = Calendar.getInstance()
         val todayDateStr = dateFormat.format(todayCalendar.time)
         
         val yesterdayCalendar = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
         val yesterdayDateStr = dateFormat.format(yesterdayCalendar.time)
 
+        // Pre-process grouping
         val dataByDate = mealsWithDishes.groupBy { 
             val cal = Calendar.getInstance().apply { timeInMillis = it.session.scheduledTimestamp }
             isoFormat.format(cal.time)
