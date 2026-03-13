@@ -4,6 +4,7 @@ import android.app.Application
 import com.planmyplate.data.AppDatabase
 import com.planmyplate.data.repository.DriveRepository
 import com.planmyplate.data.repository.MealRepository
+import com.planmyplate.data.repository.SyncLogRepository
 import com.planmyplate.data.repository.UserRepository
 
 class PlanMyPlateApp : Application() {
@@ -15,6 +16,10 @@ class PlanMyPlateApp : Application() {
     
     val mealRepository by lazy { 
         MealRepository(this, database.mealDao()) 
+    }
+
+    val syncLogRepository by lazy {
+        SyncLogRepository(database.syncLogDao())
     }
     
     val userRepository by lazy {

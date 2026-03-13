@@ -10,7 +10,9 @@ import androidx.work.ListenableWorker.Result
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.planmyplate.data.AppDatabase
 import com.planmyplate.data.repository.CalendarRepository
+import com.planmyplate.data.repository.SyncLogRepository
 import com.planmyplate.model.MealCalendarMapping
+import com.planmyplate.model.SyncLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -25,7 +27,17 @@ class CalendarSyncWorker(
     }
 
     override suspend fun doWork(): Result {
+        val database = AppDatabase.getDatabase(applicationContext)
+        val syncLogRepository = SyncLogRepository(database.syncLogDao())
+
         if (!isCalendarAuthorized()) {
+            syncLogRepository.log(
+                service = SyncLog.SERVICE_CALENDAR,
+                action = "Calendar sync",
+                status = SyncLog.STATUS_SKIPPED,
+                source = SyncLog.SOURCE_QUEUE,
+                message = "Skipped because Calendar is disconnected"
+            )
             return Result.success()
         }
 
@@ -33,7 +45,6 @@ class CalendarSyncWorker(
         if (sessionId == -1L) return Result.failure()
 
         val isDeletion = inputData.getBoolean("isDeletion", false)
-        val database = AppDatabase.getDatabase(applicationContext)
         val repository = CalendarRepository(applicationContext)
         val mealDao = database.mealDao()
 
@@ -41,6 +52,14 @@ class CalendarSyncWorker(
             val toastMessage = if (isDeletion) {
                 val eventId = inputData.getString("calendarEventId")
                 eventId?.let { repository.deleteEvent(it) }
+                syncLogRepository.log(
+                    service = SyncLog.SERVICE_CALENDAR,
+                    action = "Delete calendar event",
+                    status = SyncLog.STATUS_SUCCESS,
+                    source = SyncLog.SOURCE_QUEUE,
+                    message = "Removed meal from Google Calendar",
+                    sessionId = sessionId
+                )
                 "Meal removed from Google Calendar"
             } else {
                 val mealWithDishes = mealDao.getMealWithDishes(sessionId) ?: return Result.failure()
@@ -66,6 +85,14 @@ class CalendarSyncWorker(
                 } else {
                     repository.updateEvent(calendarEventId, session, dishNames)
                 }
+                syncLogRepository.log(
+                    service = SyncLog.SERVICE_CALENDAR,
+                    action = "Upsert calendar event",
+                    status = SyncLog.STATUS_SUCCESS,
+                    source = SyncLog.SOURCE_QUEUE,
+                    message = "Calendar event synchronized for session $sessionId",
+                    sessionId = sessionId
+                )
                 "Google Calendar synchronized"
             }
 
@@ -76,8 +103,24 @@ class CalendarSyncWorker(
 
             Result.success()
         } catch (e: UserRecoverableAuthIOException) {
+            syncLogRepository.log(
+                service = SyncLog.SERVICE_CALENDAR,
+                action = "Calendar sync",
+                status = SyncLog.STATUS_FAILURE,
+                source = SyncLog.SOURCE_QUEUE,
+                message = "Authorization required to access Google Calendar",
+                sessionId = sessionId
+            )
             Result.failure()
         } catch (e: Exception) {
+            syncLogRepository.log(
+                service = SyncLog.SERVICE_CALENDAR,
+                action = "Calendar sync",
+                status = SyncLog.STATUS_FAILURE,
+                source = SyncLog.SOURCE_QUEUE,
+                message = e.message ?: "Unknown Calendar error",
+                sessionId = sessionId
+            )
             if (runAttemptCount < 3) Result.retry() else Result.failure()
         }
     }

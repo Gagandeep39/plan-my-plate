@@ -9,7 +9,9 @@ import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
 import com.google.api.services.drive.model.File
 import com.google.api.services.drive.model.Permission
+import com.planmyplate.data.AppDatabase
 import com.planmyplate.model.MealWithDishes
+import com.planmyplate.model.SyncLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -21,6 +23,23 @@ import java.util.Locale
 import java.util.TimeZone
 
 class DriveRepository(private val context: Context) {
+
+    private suspend fun insertSyncLog(
+        action: String,
+        status: String,
+        source: String,
+        message: String,
+        sessionId: Long? = null
+    ) {
+        SyncLogRepository(AppDatabase.getDatabase(context).syncLogDao()).log(
+            service = SyncLog.SERVICE_DRIVE,
+            action = action,
+            status = status,
+            source = source,
+            message = message,
+            sessionId = sessionId
+        )
+    }
 
     private fun buildDirectJsonUrl(fileId: String): String {
         return "https://drive.google.com/uc?export=download&id=$fileId"
@@ -114,7 +133,7 @@ class DriveRepository(private val context: Context) {
         return jsonArray.toString(2)
     }
 
-    suspend fun createOrGetSharableJsonFile(): String? = withContext(Dispatchers.IO) {
+    suspend fun createOrGetSharableJsonFile(source: String = SyncLog.SOURCE_DIRECT): String? = withContext(Dispatchers.IO) {
         val service = getDriveService() ?: return@withContext null
         
         try {
@@ -122,17 +141,38 @@ class DriveRepository(private val context: Context) {
 
             if (fileId != null) {
                 ensurePublicReadPermission(service, fileId)
-                buildDirectJsonUrl(fileId)
+                val link = buildDirectJsonUrl(fileId)
+                insertSyncLog(
+                    action = "Prepare shareable link",
+                    status = SyncLog.STATUS_SUCCESS,
+                    source = source,
+                    message = "Drive JSON link is ready"
+                )
+                link
             } else {
+                insertSyncLog(
+                    action = "Prepare shareable link",
+                    status = SyncLog.STATUS_FAILURE,
+                    source = source,
+                    message = "Drive JSON file could not be created"
+                )
                 null
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            insertSyncLog(
+                action = "Prepare shareable link",
+                status = SyncLog.STATUS_FAILURE,
+                source = source,
+                message = e.message ?: "Unknown Drive error"
+            )
             null
         }
     }
 
-    suspend fun replaceSharableJsonFileContent(meals: List<MealWithDishes>): String? = withContext(Dispatchers.IO) {
+    suspend fun replaceSharableJsonFileContent(
+        meals: List<MealWithDishes>,
+        source: String = SyncLog.SOURCE_QUEUE
+    ): String? = withContext(Dispatchers.IO) {
         val service = getDriveService() ?: return@withContext null
 
         try {
@@ -148,9 +188,21 @@ class DriveRepository(private val context: Context) {
                 .setFields("id")
                 .execute()
 
-            buildDirectJsonUrl(fileId)
+            val link = buildDirectJsonUrl(fileId)
+            insertSyncLog(
+                action = "Export JSON snapshot",
+                status = SyncLog.STATUS_SUCCESS,
+                source = source,
+                message = "Updated Drive JSON with ${meals.size} meals"
+            )
+            link
         } catch (e: Exception) {
-            e.printStackTrace()
+            insertSyncLog(
+                action = "Export JSON snapshot",
+                status = SyncLog.STATUS_FAILURE,
+                source = source,
+                message = e.message ?: "Unknown Drive error"
+            )
             null
         }
     }

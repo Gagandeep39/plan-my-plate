@@ -11,7 +11,9 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.planmyplate.data.AppDatabase
 import com.planmyplate.data.repository.DriveRepository
+import com.planmyplate.data.repository.SyncLogRepository
 import com.planmyplate.data.repository.UserRepository
+import com.planmyplate.model.SyncLog
 import java.util.Calendar
 
 class DriveExportWorker(
@@ -47,12 +49,21 @@ class DriveExportWorker(
     }
 
     override suspend fun doWork(): Result {
+        val database = AppDatabase.getDatabase(applicationContext)
+        val syncLogRepository = SyncLogRepository(database.syncLogDao())
+
         if (!isDriveAuthorized()) {
+            syncLogRepository.log(
+                service = SyncLog.SERVICE_DRIVE,
+                action = "Export JSON snapshot",
+                status = SyncLog.STATUS_SKIPPED,
+                source = SyncLog.SOURCE_QUEUE,
+                message = "Skipped because Drive is disconnected"
+            )
             return Result.success()
         }
 
         return try {
-            val database = AppDatabase.getDatabase(applicationContext)
             val mealDao = database.mealDao()
             val driveRepository = DriveRepository(applicationContext)
 
@@ -74,7 +85,7 @@ class DriveExportWorker(
             }.timeInMillis
 
             val meals = mealDao.getMealsInRange(start, end)
-            val link = driveRepository.replaceSharableJsonFileContent(meals)
+            val link = driveRepository.replaceSharableJsonFileContent(meals, source = SyncLog.SOURCE_QUEUE)
 
             if (link != null) {
                 applicationContext

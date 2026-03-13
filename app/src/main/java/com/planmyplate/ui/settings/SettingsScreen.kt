@@ -8,6 +8,8 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -17,30 +19,38 @@ import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.planmyplate.PlanMyPlateApp
+import com.planmyplate.model.SyncLog
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(
+    onBack: () -> Unit,
+    onOpenSyncHistory: () -> Unit
+) {
     val context = LocalContext.current
     val app = context.applicationContext as PlanMyPlateApp
     
     val viewModel: SettingsViewModel = viewModel(
-        factory = SettingsViewModelFactory(app.userRepository, app.driveRepository)
+        factory = SettingsViewModelFactory(app.userRepository, app.driveRepository, app.syncLogRepository)
     )
     val uiState by viewModel.uiState.collectAsState()
+    val scrollState = rememberScrollState()
 
     val authLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
@@ -64,7 +74,8 @@ fun SettingsScreen(onBack: () -> Unit) {
             modifier = Modifier
                 .padding(padding)
                 .padding(16.dp)
-                .fillMaxSize(),
+                .fillMaxSize()
+                .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             OutlinedCard(modifier = Modifier.fillMaxWidth()) {
@@ -197,7 +208,11 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            SyncLogsCard(
+                syncLogs = uiState.syncLogs,
+                onOpenSyncHistory = onOpenSyncHistory
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             
             Text(
                 "App Version: 1.0.0",
@@ -206,6 +221,91 @@ fun SettingsScreen(onBack: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Composable
+private fun SyncLogsCard(
+    syncLogs: List<SyncLog>,
+    onOpenSyncHistory: () -> Unit
+) {
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Sync Activity", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Recent Calendar and Drive updates",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                TextButton(onClick = onOpenSyncHistory) {
+                    Text("Full history")
+                }
+            }
+
+            if (syncLogs.isEmpty()) {
+                Text(
+                    "No sync activity yet",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                syncLogs.take(1).forEachIndexed { index, log ->
+                    if (index > 0) HorizontalDivider()
+                    SyncLogRow(log = log)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SyncLogRow(log: SyncLog) {
+    val timestamp = remember(log.createdAt) {
+        SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(log.createdAt))
+    }
+    val statusColor = when (log.status) {
+        SyncLog.STATUS_SUCCESS -> MaterialTheme.colorScheme.tertiary
+        SyncLog.STATUS_FAILURE -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(log.service, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Surface(
+                color = statusColor.copy(alpha = 0.12f),
+                shape = MaterialTheme.shapes.extraSmall
+            ) {
+                Text(
+                    log.status,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = statusColor
+                )
+            }
+        }
+        Text(
+            "${log.action} • ${log.source}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(log.message, style = MaterialTheme.typography.bodySmall)
+        Text(timestamp, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

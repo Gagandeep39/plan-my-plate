@@ -17,7 +17,9 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.api.services.calendar.CalendarScopes
 import com.google.api.services.drive.DriveScopes
 import com.planmyplate.data.repository.DriveRepository
+import com.planmyplate.data.repository.SyncLogRepository
 import com.planmyplate.data.repository.UserRepository
+import com.planmyplate.model.SyncLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +31,7 @@ data class SettingsUiState(
     val isDriveConnected: Boolean = false,
     val userEmail: String? = null,
     val sharableLink: String? = null,
+    val syncLogs: List<SyncLog> = emptyList(),
     val error: String? = null,
     val isLoadingLink: Boolean = false
 )
@@ -37,7 +40,8 @@ private enum class AuthStep { SIGN_IN, CALENDAR_ONLY, DRIVE_ONLY }
 
 class SettingsViewModel(
     private val userRepository: UserRepository,
-    private val driveRepository: DriveRepository
+    private val driveRepository: DriveRepository,
+    private val syncLogRepository: SyncLogRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -86,6 +90,11 @@ class SettingsViewModel(
                         silentlyVerifyDriveLink()
                     }
                 }
+            }
+        }
+        viewModelScope.launch {
+            syncLogRepository.getAllSyncLogs().collect { logs ->
+                _uiState.update { it.copy(syncLogs = logs) }
             }
         }
     }
@@ -227,12 +236,13 @@ class SettingsViewModel(
 
 class SettingsViewModelFactory(
     private val userRepository: UserRepository,
-    private val driveRepository: DriveRepository
+    private val driveRepository: DriveRepository,
+    private val syncLogRepository: SyncLogRepository
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return SettingsViewModel(userRepository, driveRepository) as T
+            return SettingsViewModel(userRepository, driveRepository, syncLogRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

@@ -18,6 +18,7 @@ import com.planmyplate.ui.home.HomeScreen
 import com.planmyplate.ui.mealform.MealForm
 import com.planmyplate.ui.navigation.NavTransitions
 import com.planmyplate.ui.settings.SettingsScreen
+import com.planmyplate.ui.settings.SyncHistoryScreen
 import com.planmyplate.ui.theme.PlanMyPlateTheme
 
 class MainActivity : ComponentActivity() {
@@ -62,7 +63,13 @@ fun AppNavigation() {
             )
         }
         composable("settings") {
-            SettingsScreen(onBack = { navController.popBackStack() })
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenSyncHistory = { navController.navigate("sync_history") }
+            )
+        }
+        composable("sync_history") {
+            SyncHistoryScreen(onBack = { navController.popBackStack() })
         }
         composable(
             route = "meal_form?sessionId={sessionId}",
