@@ -119,10 +119,23 @@ fun MealCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = meal.formattedTime, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = meal.name, 
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.sp), 
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = meal.type.name.lowercase().replaceFirstChar { it.uppercase() }, 
+                            style = MaterialTheme.typography.labelLarge, 
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(text = meal.name, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.sp), color = MaterialTheme.colorScheme.onSurface)
-                        Text(text = meal.type.name.lowercase().replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = meal.formattedTime, 
+                            style = MaterialTheme.typography.bodySmall, 
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                     
                     if (isSelected) {

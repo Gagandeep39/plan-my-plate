@@ -4,6 +4,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -88,7 +89,8 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
             // Date Selection
             OutlinedCard(
                 onClick = { showDatePicker = true },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -136,7 +138,8 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
             // Time Selection
             OutlinedCard(
                 onClick = { showTimePicker = true },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -173,7 +176,8 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                             Icon(Icons.Default.Add, contentDescription = "Add Dish")
                         }
                     },
-                    singleLine = true
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
                 )
 
                 if (uiState.dishes.isNotEmpty()) {
@@ -222,14 +226,16 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                 label = { Text("Notes (Optional)") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
-                placeholder = { Text("e.g. Low carb, extra protein...") }
+                placeholder = { Text("e.g. Low carb, extra protein...") },
+                shape = RoundedCornerShape(12.dp)
             )
 
             // Submit Button
             Button(
                 onClick = { viewModel.saveMeal() },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = uiState.dishes.isNotEmpty() || uiState.currentDishName.isNotBlank()
+                enabled = uiState.dishes.isNotEmpty() || uiState.currentDishName.isNotBlank(),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Text(if (sessionId == null) "Schedule Meal" else "Update Meal")
             }
