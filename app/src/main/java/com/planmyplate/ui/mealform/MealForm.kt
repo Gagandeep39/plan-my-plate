@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -60,13 +61,21 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showMealTypeMenu by remember { mutableStateOf(false) }
 
+    // Consistent lighter border color
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+        disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+        disabledLabelColor = MaterialTheme.colorScheme.primary,
+        disabledLeadingIconColor = MaterialTheme.colorScheme.primary,
+    )
+
     LaunchedEffect(uiState.isSaved, uiState.isDeleted) {
         if (uiState.isSaved || uiState.isDeleted) {
             onBack()
         }
     }
 
-    // Auto-scroll to bottom when a dish is added
     LaunchedEffect(uiState.dishes.size) {
         if (uiState.dishes.isNotEmpty()) {
             scrollState.animateScrollTo(scrollState.maxValue)
@@ -130,12 +139,7 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                     shape = RoundedCornerShape(12.dp),
                     readOnly = true,
                     enabled = false,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledBorderColor = MaterialTheme.colorScheme.outline,
-                        disabledLabelColor = MaterialTheme.colorScheme.primary,
-                        disabledLeadingIconColor = MaterialTheme.colorScheme.primary,
-                    )
+                    colors = fieldColors
                 )
                 Box(
                     modifier = Modifier
@@ -146,49 +150,43 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
             }
 
             // Meal Type Dropdown
-            Column {
-                Text("Meal Type", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(12.dp))
+            ExposedDropdownMenuBox(
+                expanded = showMealTypeMenu,
+                onExpandedChange = { showMealTypeMenu = it },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = uiState.mealType.name.lowercase().replaceFirstChar { it.uppercase() },
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Meal Type") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    leadingIcon = { Icon(Icons.Default.RestaurantMenu, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showMealTypeMenu) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = fieldColors
+                )
                 
-                ExposedDropdownMenuBox(
+                ExposedDropdownMenu(
                     expanded = showMealTypeMenu,
-                    onExpandedChange = { showMealTypeMenu = it },
-                    modifier = Modifier.fillMaxWidth()
+                    onDismissRequest = { showMealTypeMenu = false }
                 ) {
-                    OutlinedTextField(
-                        value = uiState.mealType.name.lowercase().replaceFirstChar { it.uppercase() },
-                        onValueChange = {},
-                        readOnly = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showMealTypeMenu) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
-                    )
-                    
-                    ExposedDropdownMenu(
-                        expanded = showMealTypeMenu,
-                        onDismissRequest = { showMealTypeMenu = false }
-                    ) {
-                        MealType.entries.forEach { type ->
-                            DropdownMenuItem(
-                                text = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                                onClick = {
-                                    viewModel.onMealTypeSelected(type)
-                                    showMealTypeMenu = false
-                                }
-                            )
-                        }
+                    MealType.entries.forEach { type ->
+                        DropdownMenuItem(
+                            text = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                            onClick = {
+                                viewModel.onMealTypeSelected(type)
+                                showMealTypeMenu = false
+                            }
+                        )
                     }
                 }
             }
 
             // Dishes Management
             Column {
-                Text("Dishes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(12.dp))
-                
                 OutlinedTextField(
                     value = uiState.currentDishName,
                     onValueChange = { viewModel.onDishNameChanged(it) },
@@ -214,6 +212,7 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                     },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
+                    colors = fieldColors,
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
                         imeAction = ImeAction.Done
@@ -268,12 +267,7 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                     shape = RoundedCornerShape(12.dp),
                     readOnly = true,
                     enabled = false,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledBorderColor = MaterialTheme.colorScheme.outline,
-                        disabledLabelColor = MaterialTheme.colorScheme.primary,
-                        disabledLeadingIconColor = MaterialTheme.colorScheme.primary,
-                    )
+                    colors = fieldColors
                 )
                 Box(
                     modifier = Modifier
@@ -292,6 +286,7 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                 minLines = 3,
                 placeholder = { Text("e.g. Low carb, extra protein...") },
                 shape = RoundedCornerShape(12.dp),
+                colors = fieldColors,
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Sentences
                 )
