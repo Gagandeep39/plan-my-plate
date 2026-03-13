@@ -15,6 +15,10 @@ import java.util.Collections
 
 class DriveRepository(private val context: Context) {
 
+    private fun buildDirectJsonUrl(fileId: String): String {
+        return "https://drive.google.com/uc?export=download&id=$fileId"
+    }
+
     private fun getDriveService(): Drive? {
         val sharedPrefs = context.getSharedPreferences("plan_my_plate_prefs", Context.MODE_PRIVATE)
         val userEmail = sharedPrefs.getString("user_email", null) ?: return null
@@ -64,9 +68,8 @@ class DriveRepository(private val context: Context) {
                     role = "reader"
                 }
                 service.permissions().create(fileId, permission).execute()
-                // Construct the shareable link from the fileId — Drive API does not reliably
-                // return webViewLink for binary (non-Google-Workspace) files like JSON.
-                "https://drive.google.com/file/d/$fileId/view?usp=sharing"
+                // Return a direct download/content URL instead of Drive's file-view wrapper.
+                buildDirectJsonUrl(fileId)
             } else {
                 null
             }

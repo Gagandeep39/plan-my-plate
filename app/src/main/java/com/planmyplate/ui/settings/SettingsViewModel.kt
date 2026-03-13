@@ -46,6 +46,13 @@ class SettingsViewModel(
     private val driveScope = Scope(DriveScopes.DRIVE_FILE)
     private var currentAuthStep = AuthStep.SIGN_IN
 
+    private fun normalizeDriveLink(link: String): String {
+        val regex = Regex("/file/d/([^/]+)")
+        val match = regex.find(link) ?: return link
+        val fileId = match.groupValues.getOrNull(1) ?: return link
+        return "https://drive.google.com/uc?export=download&id=$fileId"
+    }
+
     init {
         viewModelScope.launch {
             userRepository.userEmail.collect { email ->
@@ -59,7 +66,11 @@ class SettingsViewModel(
         }
         viewModelScope.launch {
             userRepository.sharableLink.collect { link ->
-                _uiState.update { it.copy(sharableLink = link) }
+                val normalizedLink = link?.let { normalizeDriveLink(it) }
+                if (link != null && normalizedLink != link) {
+                    normalizedLink?.let { userRepository.saveSharableLink(it) }
+                }
+                _uiState.update { it.copy(sharableLink = normalizedLink) }
             }
         }
         viewModelScope.launch {
