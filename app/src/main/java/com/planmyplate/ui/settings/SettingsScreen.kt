@@ -179,6 +179,7 @@ fun SettingsScreen(
                             onDisconnect = { viewModel.disconnectCalendar() }
                         )
 
+                        var shouldNavigateToSyncCheck by remember { mutableStateOf(false) }
                         DriveCard(
                             uiState = uiState,
                             onConnect = {
@@ -188,9 +189,24 @@ fun SettingsScreen(
                             },
                             onDisconnect = { viewModel.disconnectDrive() },
                             onRefreshLink = { viewModel.refreshDriveLink() },
-                            onDbSyncToggle = { viewModel.setDbSyncEnabled(it) },
+                            onDbSyncToggle = { enabled ->
+                                viewModel.setDbSyncEnabled(enabled)
+                                if (enabled) shouldNavigateToSyncCheck = true
+                            },
                             onSyncNow = { viewModel.syncDbNow() }
                         )
+                        if (shouldNavigateToSyncCheck) {
+                            // Use LaunchedEffect to navigate only once
+                            LaunchedEffect(Unit) {
+                                // Replace with your navigation logic to sync_check screen
+                                // For example, if using NavController:
+                                // navController.navigate("sync_check")
+                                // Here, we assume a function navigateToSyncCheck() is available
+                                // navigateToSyncCheck()
+                                // Reset flag
+                                shouldNavigateToSyncCheck = false
+                            }
+                        }
                     }
                 }
             }

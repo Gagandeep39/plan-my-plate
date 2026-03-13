@@ -224,7 +224,7 @@ class SettingsViewModel(
 
     fun setDbSyncEnabled(enabled: Boolean) {
         userRepository.setDbSyncEnabled(enabled)
-        if (enabled) userRepository.enqueueDbSync()
+        // Do not trigger sync here. UI should navigate to sync_check screen, which will handle restore/sync logic.
     }
 
     fun syncDbNow() {
