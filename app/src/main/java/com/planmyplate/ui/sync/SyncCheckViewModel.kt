@@ -21,32 +21,22 @@ import java.util.Date
 import java.util.Locale
 
 sealed class SyncCheckState {
-    /** Still checking Drive. */
     object Checking : SyncCheckState()
-
-    /** No conflict — proceed to main app. */
     object Clear : SyncCheckState()
-
-    /** Both local and cloud have data but cloud is newer — user must choose. */
     data class Conflict(
         val localTimestamp: Long,
         val cloudTimestamp: Long
     ) : SyncCheckState()
-
-    /** Restoring silently (empty local DB, cloud has data). */
     object Restoring : SyncCheckState()
-
-    /** Restore or resolution completed — app must recreate to pick up new DB. */
     object RestoreComplete : SyncCheckState()
-
-    /** Drive unavailable or sync not enabled — proceed normally. */
     object Skipped : SyncCheckState()
 }
 
 class SyncCheckViewModel(
     private val context: Context,
     private val driveRepository: DriveRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val isManualSync: Boolean = false
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<SyncCheckState>(SyncCheckState.Checking)
@@ -68,55 +58,51 @@ class SyncCheckViewModel(
         }
 
         val cloudInfo = driveRepository.getCloudBackupInfo()
+        val lastWrite = prefs.getLong(UserRepository.KEY_DB_LAST_WRITE_TIMESTAMP, 0L)
+        val lastUpload = prefs.getLong(UserRepository.KEY_DB_LAST_UPLOAD_TIMESTAMP, 0L)
+        val hasLocalChanges = lastWrite > lastUpload
+
+        // 1. No cloud backup exists yet
         if (cloudInfo == null) {
-            // No backup on Drive yet — nothing to restore or conflict with.
-            // However, we should trigger an initial backup of what we have.
-            userRepository.enqueueDbSyncForced()
+            if (isManualSync || hasLocalChanges) userRepository.enqueueDbSyncForced()
             _state.value = SyncCheckState.Clear
             return
         }
+
         latestCloudTimestamp = cloudInfo.modifiedTimeMs
 
+        // 2. Empty local DB - always restore if cloud data is available
         val localMealCount = withContext(Dispatchers.IO) {
             AppDatabase.getDatabase(context).mealDao().getMealCount()
         }
-
         if (localMealCount == 0) {
-            // Empty local DB — silently restore from Drive
             _state.value = SyncCheckState.Restoring
             restoreFromCloud()
             return
         }
 
-        val lastUpload = prefs.getLong(UserRepository.KEY_DB_LAST_UPLOAD_TIMESTAMP, 0L)
+        // 3. Conflict detection: Cloud is newer than our last successful interaction
         if (cloudInfo.modifiedTimeMs > lastUpload) {
-            // Someone on another device uploaded more recently than our last sync
-            val lastWrite = prefs.getLong(UserRepository.KEY_DB_LAST_WRITE_TIMESTAMP, 0L)
             _state.value = SyncCheckState.Conflict(
                 localTimestamp = lastWrite,
                 cloudTimestamp = cloudInfo.modifiedTimeMs
             )
         } else {
-            // Local is up to date or ahead of cloud. 
-            // Trigger a forced backup to ensure local changes are synced.
-            userRepository.enqueueDbSyncForced()
+            // 4. Local is up-to-date or ahead. Backup if manual OR if changes exist.
+            if (isManualSync || hasLocalChanges) {
+                userRepository.enqueueDbSyncForced()
+            }
             _state.value = SyncCheckState.Clear
         }
     }
 
-    /** User chose to keep local data. Record this and push to cloud. */
     fun keepLocal() {
-        // Update upload timestamp to match cloud so we stop detecting "conflict"
         val now = System.currentTimeMillis()
-        userRepository.recordUploadTimestamp(
-            latestCloudTimestamp.coerceAtLeast(now)
-        )
-        // Push local data to cloud immediately
+        userRepository.recordUploadTimestamp(latestCloudTimestamp.coerceAtLeast(now))
         userRepository.enqueueDbSyncForced()
         _state.value = SyncCheckState.Clear
     }
 
-    /** User chose to restore from cloud. Download + replace DB + signal activity to recreate. */
     fun useCloud() {
         _state.value = SyncCheckState.Restoring
         viewModelScope.launch { restoreFromCloud() }
@@ -129,13 +115,11 @@ class SyncCheckViewModel(
             }
             val success = driveRepository.downloadDatabaseBackup(targetFile)
             if (!success || !targetFile.exists()) {
-                Log.w("SyncCheck", "Download failed, proceeding without restore")
                 _state.value = SyncCheckState.Clear
                 return
             }
 
             withContext(Dispatchers.IO) {
-                // Close database and clear repository references in Application class
                 (context.applicationContext as? PlanMyPlateApp)?.resetDatabaseReferences()
                     ?: AppDatabase.closeAndReset()
 
@@ -145,20 +129,17 @@ class SyncCheckViewModel(
 
                 dbFile.parentFile?.mkdirs()
                 targetFile.copyTo(dbFile, overwrite = true)
-                // Remove stale WAL/SHM so Room opens cleanly against the restored file
                 if (walFile.exists()) walFile.delete()
                 if (shmFile.exists()) shmFile.delete()
 
-                // Record the cloud's modified time as our upload timestamp to avoid
-                // re-detecting a conflict on the next launch
                 val prefs = context.getSharedPreferences(UserRepository.PREFS_NAME, Context.MODE_PRIVATE)
                 val cloudInfo = driveRepository.getCloudBackupInfo()
+                val cloudTs = cloudInfo?.modifiedTimeMs ?: System.currentTimeMillis()
+                
+                // After restore, we are in sync with the cloud.
                 prefs.edit()
-                    .putLong(
-                        UserRepository.KEY_DB_LAST_UPLOAD_TIMESTAMP,
-                        cloudInfo?.modifiedTimeMs ?: System.currentTimeMillis()
-                    )
-                    .putLong(UserRepository.KEY_DB_LAST_WRITE_TIMESTAMP, System.currentTimeMillis())
+                    .putLong(UserRepository.KEY_DB_LAST_UPLOAD_TIMESTAMP, cloudTs)
+                    .putLong(UserRepository.KEY_DB_LAST_WRITE_TIMESTAMP, cloudTs)
                     .apply()
 
                 targetFile.delete()
@@ -178,10 +159,11 @@ class SyncCheckViewModel(
 class SyncCheckViewModelFactory(
     private val context: Context,
     private val driveRepository: DriveRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val isManualSync: Boolean = false
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         @Suppress("UNCHECKED_CAST")
-        return SyncCheckViewModel(context, driveRepository, userRepository) as T
+        return SyncCheckViewModel(context, driveRepository, userRepository, isManualSync) as T
     }
 }

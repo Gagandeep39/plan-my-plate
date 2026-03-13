@@ -85,6 +85,13 @@ class DriveDbSyncWorker(
             val lastSync = prefs.getLong(UserRepository.KEY_DB_LAST_SYNC_TIMESTAMP, 0L)
             val elapsed = System.currentTimeMillis() - lastSync
             if (elapsed < COOLDOWN_MS) return Result.success()
+
+            val lastWrite = prefs.getLong(UserRepository.KEY_DB_LAST_WRITE_TIMESTAMP, 0L)
+            val lastUpload = prefs.getLong(UserRepository.KEY_DB_LAST_UPLOAD_TIMESTAMP, 0L)
+            if (lastWrite <= lastUpload) {
+                // No changes since last backup, skip.
+                return Result.success()
+            }
         }
 
         return try {

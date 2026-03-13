@@ -17,13 +17,14 @@ import com.planmyplate.PlanMyPlateApp
 
 @Composable
 fun SyncCheckScreen(
+    isManualSync: Boolean = false,
     onClear: () -> Unit,
     onRestoreComplete: () -> Unit
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as PlanMyPlateApp
     val viewModel: SyncCheckViewModel = viewModel(
-        factory = SyncCheckViewModelFactory(context, app.driveRepository, app.userRepository)
+        factory = SyncCheckViewModelFactory(context, app.driveRepository, app.userRepository, isManualSync)
     )
     val state by viewModel.state.collectAsState()
 

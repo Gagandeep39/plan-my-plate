@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Kick off a DB backup on every fresh start (worker handles cooldown + auth checks)
+        // Kick off a DB backup on every fresh start (worker handles cooldown + auth checks + change checks)
         (applicationContext as PlanMyPlateApp).userRepository.enqueueDbSync()
 
         setContent {
@@ -74,12 +74,26 @@ fun AppNavigation() {
                 }
             )
         }
-        composable("sync_check") {
+        composable(
+            route = "sync_check?fromSettings={fromSettings}",
+            arguments = listOf(
+                navArgument("fromSettings") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                }
+            )
+        ) { backStackEntry ->
+            val fromSettings = backStackEntry.arguments?.getBoolean("fromSettings") ?: false
             val activity = (LocalContext.current as? android.app.Activity)
             SyncCheckScreen(
+                isManualSync = fromSettings,
                 onClear = {
-                    navController.navigate("timeline") {
-                        popUpTo("sync_check") { inclusive = true }
+                    if (fromSettings) {
+                        navController.popBackStack()
+                    } else {
+                        navController.navigate("timeline") {
+                            popUpTo("sync_check?fromSettings={fromSettings}") { inclusive = true }
+                        }
                     }
                 },
                 onRestoreComplete = {
@@ -87,7 +101,7 @@ fun AppNavigation() {
                     activity?.recreate()
                     // Also navigate away from sync_check to avoid reload loop
                     navController.navigate("timeline") {
-                        popUpTo("sync_check") { inclusive = true }
+                        popUpTo("sync_check?fromSettings={fromSettings}") { inclusive = true }
                     }
                 }
             )
@@ -97,7 +111,7 @@ fun AppNavigation() {
                 onBack = { navController.popBackStack() },
                 onOpenSyncHistory = { navController.navigate("sync_history") },
                 onNavigateToSyncCheck = {
-                    navController.navigate("sync_check")
+                    navController.navigate("sync_check?fromSettings=true")
                 }
             )
         }
