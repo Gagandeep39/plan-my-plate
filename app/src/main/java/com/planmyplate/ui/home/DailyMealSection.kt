@@ -26,7 +26,7 @@ fun LazyListScope.DailyMealSection(
     }
 
     item {
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
     }
 
     // Adding stable keys to meal items is crucial for smooth scrolling and animations
