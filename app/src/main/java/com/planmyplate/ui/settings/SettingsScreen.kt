@@ -13,9 +13,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -140,69 +142,16 @@ fun SettingsScreen(onBack: () -> Unit) {
                 )
 
                 // Google Drive Service
-                Column {
-                    ServiceCard(
-                        title = "Google Drive",
-                        description = "Backup meal data as JSON",
-                        isConnected = uiState.isDriveConnected,
-                        onConnect = {
-                            viewModel.connectDrive(context) { pendingIntent ->
-                                authLauncher.launch(IntentSenderRequest.Builder(pendingIntent).build())
-                            }
-                        },
-                        onDisconnect = { viewModel.disconnectDrive() }
-                    )
-                    
-                    if (uiState.isDriveConnected) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        if (uiState.isLoadingLink) {
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                        } else if (uiState.sharableLink == null) {
-                            OutlinedButton(
-                                onClick = { viewModel.refreshDriveLink() },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(Icons.Default.Sync, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Get share link")
-                            }
-                        } else if (uiState.sharableLink != null) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                shape = MaterialTheme.shapes.small,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = uiState.sharableLink!!,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    IconButton(
-                                        onClick = {
-                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                            val clip = ClipData.newPlainText("Meal Plan Link", uiState.sharableLink)
-                                            clipboard.setPrimaryClip(clip)
-                                            Toast.makeText(context, "Link copied to clipboard", Toast.LENGTH_SHORT).show()
-                                        },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.ContentCopy, 
-                                            contentDescription = "Copy Link",
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
-                            }
+                DriveCard(
+                    uiState = uiState,
+                    onConnect = {
+                        viewModel.connectDrive(context) { pendingIntent ->
+                            authLauncher.launch(IntentSenderRequest.Builder(pendingIntent).build())
                         }
-                    }
-                }
+                    },
+                    onDisconnect = { viewModel.disconnectDrive() },
+                    onRefreshLink = { viewModel.refreshDriveLink() }
+                )
             }
 
             uiState.error?.let { errorMsg ->
@@ -228,6 +177,149 @@ fun SettingsScreen(onBack: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.Gray
             )
+        }
+    }
+}
+
+@Composable
+fun DriveCard(
+    uiState: SettingsUiState,
+    onConnect: () -> Unit,
+    onDisconnect: () -> Unit,
+    onRefreshLink: () -> Unit
+) {
+    val context = LocalContext.current
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Header row
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Icon(
+                    Icons.Default.Cloud,
+                    contentDescription = null,
+                    tint = if (uiState.isDriveConnected) MaterialTheme.colorScheme.primary else Color.Gray
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Google Drive", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                    Text("Backup and share meal data", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                }
+                if (uiState.isDriveConnected) {
+                    TextButton(
+                        onClick = onDisconnect,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) { Text("Disable") }
+                } else {
+                    TextButton(onClick = onConnect) { Text("Enable") }
+                }
+            }
+
+            if (uiState.isDriveConnected) {
+                HorizontalDivider()
+
+                // Option 1: Share Meal Plan
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                        Column {
+                            Text("Share Meal Plan", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                            Text("Public link to view your current meal plan", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        }
+                    }
+                    if (uiState.isLoadingLink) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    } else if (uiState.sharableLink == null) {
+                        OutlinedButton(onClick = onRefreshLink, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.Sync, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Get share link")
+                        }
+                    } else {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = uiState.sharableLink!!,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(
+                                    onClick = {
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        val clip = ClipData.newPlainText("Meal Plan Link", uiState.sharableLink)
+                                        clipboard.setPrimaryClip(clip)
+                                        Toast.makeText(context, "Link copied to clipboard", Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy link", modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider()
+
+                // Option 2: Cloud Sync (coming soon)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Backup,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = Color.Gray
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                "Cloud Sync",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = Color.Gray
+                            )
+                            Surface(
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                shape = MaterialTheme.shapes.extraSmall
+                            ) {
+                                Text(
+                                    "Coming soon",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Text("Automatically back up meals to Drive", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                    Switch(checked = false, onCheckedChange = null, enabled = false)
+                }
+            }
         }
     }
 }
