@@ -4,6 +4,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -61,7 +66,16 @@ fun AppNavigation() {
         popEnterTransition = NavTransitions.popEnterTransition,
         popExitTransition = NavTransitions.popExitTransition
     ) {
-        composable("timeline") {
+        composable(
+            route = "timeline",
+            enterTransition = {
+                if (initialState.destination.route?.startsWith("sync_check") == true) {
+                    fadeIn(animationSpec = tween(250))
+                } else {
+                    NavTransitions.enterTransition(this)
+                }
+            }
+        ) {
             HomeScreen(
                 onAddMeal = {
                     navController.navigate("meal_form")
@@ -81,7 +95,15 @@ fun AppNavigation() {
                     type = NavType.BoolType
                     defaultValue = false
                 }
-            )
+            ),
+            enterTransition = { EnterTransition.None },
+            exitTransition = { 
+                if (targetState.destination.route == "timeline") {
+                    fadeOut(animationSpec = tween(250))
+                } else {
+                    NavTransitions.exitTransition(this)
+                }
+            }
         ) { backStackEntry ->
             val fromSettings = backStackEntry.arguments?.getBoolean("fromSettings") ?: false
             val activity = (LocalContext.current as? android.app.Activity)
@@ -97,9 +119,7 @@ fun AppNavigation() {
                     }
                 },
                 onRestoreComplete = {
-                    // Recreate the activity so Room re-opens against the restored DB file
                     activity?.recreate()
-                    // Also navigate away from sync_check to avoid reload loop
                     navController.navigate("timeline") {
                         popUpTo("sync_check?fromSettings={fromSettings}") { inclusive = true }
                     }

@@ -9,13 +9,7 @@ import com.planmyplate.model.Meal
 import com.planmyplate.model.MealType
 import com.planmyplate.model.MealWithDishes
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -26,9 +20,8 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
     private val _selectedMealIds = MutableStateFlow<Set<String>>(emptySet())
     val selectedMealIds: StateFlow<Set<String>> = _selectedMealIds.asStateFlow()
 
-    private val _allMealsWithDishes = MutableStateFlow<List<MealWithDishes>>(emptyList())
+    private val _allMealsWithDishes = MutableStateFlow<List<MealWithDishes>?>(null)
 
-    // Cache formats to avoid expensive re-allocation
     private val dateFormat = SimpleDateFormat("EEEE, MMMM dd", Locale.getDefault())
     private val isoFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
@@ -41,15 +34,15 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
     }
 
     val timelineState: StateFlow<List<DayPlan>> = _allMealsWithDishes
+        .filterNotNull()
         .map { mealsWithDishes ->
-            // Move heavy computation to Default dispatcher to keep UI thread free
             withContext(Dispatchers.Default) {
                 generateTimeline(mealsWithDishes)
             }
         }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
+            started = SharingStarted.Eagerly,
             initialValue = emptyList()
         )
 
@@ -66,7 +59,7 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
     fun deleteSelectedMeals() {
         viewModelScope.launch {
             val idsToDelete = _selectedMealIds.value
-            val mealsToDelete = _allMealsWithDishes.value.filter { it.session.sessionId.toString() in idsToDelete }
+            val mealsToDelete = (_allMealsWithDishes.value ?: emptyList()).filter { it.session.sessionId.toString() in idsToDelete }
             
             mealsToDelete.forEach { 
                 repository.deleteMeal(it.session)
@@ -82,7 +75,6 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
         val yesterdayCalendar = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
         val yesterdayDateStr = dateFormat.format(yesterdayCalendar.time)
 
-        // Pre-process grouping
         val dataByDate = mealsWithDishes.groupBy { 
             val cal = Calendar.getInstance().apply { timeInMillis = it.session.scheduledTimestamp }
             isoFormat.format(cal.time)
@@ -93,8 +85,9 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
         genCalendar.add(Calendar.DAY_OF_YEAR, -10) 
 
         for (i in 0..20) { 
-            val currentIsoDate = isoFormat.format(genCalendar.time)
-            val currentDateStr = dateFormat.format(genCalendar.time)
+            val time = genCalendar.time
+            val currentIsoDate = isoFormat.format(time)
+            val currentDateStr = dateFormat.format(time)
             
             val mealsForDate = dataByDate[currentIsoDate] ?: emptyList()
             
@@ -122,6 +115,13 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
                 )
             )
             genCalendar.add(Calendar.DAY_OF_YEAR, 1)
+        }
+
+        // Sort: Today always at the top
+        val todayIndex = fullTimeline.indexOfFirst { it.isToday }
+        if (todayIndex > 0) {
+            val today = fullTimeline.removeAt(todayIndex)
+            fullTimeline.add(0, today)
         }
 
         return fullTimeline

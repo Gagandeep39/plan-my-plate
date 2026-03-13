@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -33,7 +34,6 @@ fun HomeScreen(
     )
     
     val rawDayPlans by viewModel.timelineState.collectAsState()
-    // Ensure today's plan is always at the front
     val dayPlans = remember(rawDayPlans) {
         val todayIndex = rawDayPlans.indexOfFirst { it.isToday }
         if (todayIndex > 0) {
@@ -57,8 +57,11 @@ fun HomeScreen(
         }
     }
 
+    // Use alpha to hide the list until it's scrolled to the correct position
+    var isReadyToShow by remember { mutableStateOf(false) }
+    
     LaunchedEffect(dayPlans) {
-        if (dayPlans.isNotEmpty()) {
+        if (dayPlans.isNotEmpty() && !isReadyToShow) {
             val todayIndex = dayPlans.indexOfFirst { it.isToday }
             if (todayIndex != -1) {
                 var scrollTarget = 0
@@ -67,10 +70,13 @@ fun HomeScreen(
                 }
                 listState.scrollToItem(scrollTarget)
             }
+            // Small delay to ensure the scroll has settled before revealing
+            isReadyToShow = true
         }
     }
 
     Scaffold(
+        modifier = Modifier.alpha(if (isReadyToShow) 1f else 0f),
         topBar = {
             Surface(
                 modifier = Modifier.shadow(4.dp),
