@@ -1,8 +1,6 @@
 package com.planmyplate.data.repository
 
-import android.accounts.Account
 import android.content.Context
-import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.http.FileContent
 import com.google.api.client.http.javanet.NetHttpTransport
@@ -12,6 +10,7 @@ import com.google.api.services.drive.DriveScopes
 import com.google.api.services.drive.model.File
 import com.google.api.services.drive.model.Permission
 import com.planmyplate.data.AppDatabase
+import com.planmyplate.util.AuthAccountResolver
 import java.io.FileOutputStream
 import com.planmyplate.model.MealWithDishes
 import com.planmyplate.model.SyncLog
@@ -26,28 +25,6 @@ import java.util.Locale
 import java.util.TimeZone
 
 class DriveRepository(private val context: Context) {
-
-    private fun resolveGoogleAccount(): Account? {
-        val sharedPrefs = context.getSharedPreferences(UserRepository.PREFS_NAME, Context.MODE_PRIVATE)
-
-        val signedInAccount = GoogleSignIn.getLastSignedInAccount(context)?.account
-        if (signedInAccount?.name?.isNotBlank() == true) {
-            sharedPrefs.edit().putString(UserRepository.KEY_USER_EMAIL, signedInAccount.name).apply()
-            return signedInAccount
-        }
-
-        val emailFromPrefs = sharedPrefs
-            .getString(UserRepository.KEY_USER_EMAIL, null)
-            ?.trim()
-            ?.takeIf { it.contains("@") }
-            ?: return null
-
-        return try {
-            Account(emailFromPrefs, "com.google")
-        } catch (_: Exception) {
-            null
-        }
-    }
 
     private suspend fun insertSyncLog(
         action: String,
@@ -72,7 +49,7 @@ class DriveRepository(private val context: Context) {
 
     private fun getDriveService(): Drive? {
         return try {
-            val account = resolveGoogleAccount() ?: return null
+            val account = AuthAccountResolver.resolveGoogleAccount(context) ?: return null
 
             val credential = GoogleAccountCredential.usingOAuth2(
                 context, Collections.singleton(DriveScopes.DRIVE_FILE)

@@ -203,18 +203,6 @@ class SettingsViewModel(
         }
     }
 
-    // Verifies the Drive file still exists without touching the loading UI.
-    // If the file was deleted externally, it gets re-created and the cache is updated.
-    // On network failure we keep the cached link — it may still be valid.
-    private fun silentlyVerifyDriveLink() {
-        viewModelScope.launch {
-            val freshLink = driveRepository.createOrGetSharableJsonFile()
-            if (freshLink != null && freshLink != userRepository.sharableLink.value) {
-                userRepository.saveSharableLink(freshLink)
-            }
-        }
-    }
-
     fun refreshDriveLink() {
         if (_uiState.value.isLoadingLink) return
         viewModelScope.launch {

@@ -1,9 +1,7 @@
 package com.planmyplate.data.repository
 
-import android.accounts.Account
 import android.content.Context
 import android.util.Log
-import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.google.api.client.http.javanet.NetHttpTransport
@@ -14,36 +12,15 @@ import com.google.api.services.calendar.CalendarScopes
 import com.google.api.services.calendar.model.Event
 import com.google.api.services.calendar.model.EventDateTime
 import com.planmyplate.model.MealSession
+import com.planmyplate.util.AuthAccountResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Collections
 
 class CalendarRepository(private val context: Context) {
 
-    private fun resolveGoogleAccount(): Account? {
-        val sharedPrefs = context.getSharedPreferences(UserRepository.PREFS_NAME, Context.MODE_PRIVATE)
-
-        val signedInAccount = GoogleSignIn.getLastSignedInAccount(context)?.account
-        if (signedInAccount?.name?.isNotBlank() == true) {
-            sharedPrefs.edit().putString(UserRepository.KEY_USER_EMAIL, signedInAccount.name).apply()
-            return signedInAccount
-        }
-
-        val emailFromPrefs = sharedPrefs
-            .getString(UserRepository.KEY_USER_EMAIL, null)
-            ?.trim()
-            ?.takeIf { it.contains("@") }
-            ?: return null
-
-        return try {
-            Account(emailFromPrefs, "com.google")
-        } catch (_: Exception) {
-            null
-        }
-    }
-
     private fun getCalendarService(): Calendar? {
-        val account = resolveGoogleAccount() ?: return null
+        val account = AuthAccountResolver.resolveGoogleAccount(context) ?: return null
 
         val credential = GoogleAccountCredential.usingOAuth2(
             context, Collections.singleton(CalendarScopes.CALENDAR)
