@@ -10,16 +10,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.planmyplate.data.AppDatabase
-import com.planmyplate.ui.TimelineViewModel
-import com.planmyplate.ui.TimelineViewModelFactory
+import com.planmyplate.data.repository.MealRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(onAddMeal: () -> Unit, onEditMeal: (Long) -> Unit) {
     val context = LocalContext.current
     val database = remember { AppDatabase.getDatabase(context) }
+    val repository = remember { MealRepository(database.mealDao()) }
     val viewModel: TimelineViewModel = viewModel(
-        factory = TimelineViewModelFactory(database.mealDao())
+        factory = TimelineViewModelFactory(repository)
     )
     
     val dayPlans by viewModel.timelineState.collectAsState()
@@ -31,6 +31,7 @@ fun HomeScreen(onAddMeal: () -> Unit, onEditMeal: (Long) -> Unit) {
             if (todayIndex != -1) {
                 var scrollTarget = 0
                 for (i in 0 until todayIndex) {
+                    // Approximate item count per section
                     scrollTarget += 1 + 1 + dayPlans[i].meals.size + 1
                 }
                 listState.scrollToItem(scrollTarget)

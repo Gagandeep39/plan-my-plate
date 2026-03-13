@@ -10,8 +10,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.planmyplate.ui.EntryScreen
 import com.planmyplate.ui.home.HomeScreen
+import com.planmyplate.ui.mealform.MealForm
 import com.planmyplate.ui.theme.PlanMyPlateTheme
 
 class MainActivity : ComponentActivity() {
@@ -33,25 +33,25 @@ fun AppNavigation() {
         composable("timeline") {
             HomeScreen(
                 onAddMeal = {
-                    navController.navigate("entry")
+                    navController.navigate("meal_form")
                 },
                 onEditMeal = { sessionId ->
-                    navController.navigate("entry?sessionId=$sessionId")
+                    navController.navigate("meal_form?sessionId=$sessionId")
                 }
             )
         }
         composable(
-            route = "entry?sessionId={sessionId}",
+            route = "meal_form?sessionId={sessionId}",
             arguments = listOf(
                 navArgument("sessionId") {
-                    type = NavType.StringType // Room ID is Long, but URL is String
+                    type = NavType.StringType 
                     nullable = true
                     defaultValue = null
                 }
             )
         ) { backStackEntry ->
             val sessionId = backStackEntry.arguments?.getString("sessionId")?.toLongOrNull()
-            EntryScreen(
+            MealForm(
                 sessionId = sessionId,
                 onBack = {
                     navController.popBackStack()
