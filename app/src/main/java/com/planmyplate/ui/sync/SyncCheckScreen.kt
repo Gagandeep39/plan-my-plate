@@ -173,7 +173,7 @@ private fun ConflictResolutionScreen(
         }
 
         Text(
-            "Tap a card to select. The other version will be discarded.",
+            "Tap a card to select. The other version will be permanently discarded.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center

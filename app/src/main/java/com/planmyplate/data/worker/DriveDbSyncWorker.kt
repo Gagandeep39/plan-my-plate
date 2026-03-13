@@ -13,6 +13,7 @@ import androidx.work.workDataOf
 import com.planmyplate.PlanMyPlateApp
 import com.planmyplate.data.AppDatabase
 import com.planmyplate.data.repository.DriveRepository
+import com.planmyplate.data.repository.SyncLogRepository
 import com.planmyplate.data.repository.UserRepository
 import com.planmyplate.model.SyncLog
 import java.io.File
@@ -71,6 +72,7 @@ class DriveDbSyncWorker(
         val app = applicationContext as PlanMyPlateApp
         val database = AppDatabase.getDatabase(applicationContext)
         val syncLogRepo = app.syncLogRepository
+        val driveRepo = app.driveRepository
 
         if (!prefs.getBoolean(UserRepository.KEY_DRIVE_AUTHORIZED, false) ||
             !prefs.getBoolean(UserRepository.KEY_DB_SYNC_ENABLED, false)
@@ -86,6 +88,25 @@ class DriveDbSyncWorker(
         }
 
         return try {
+            // --- SAFETY CHECK ---
+            // Before uploading, check if another device has uploaded something newer
+            val cloudInfo = driveRepo.getCloudBackupInfo()
+            if (cloudInfo != null) {
+                val lastUpload = prefs.getLong(UserRepository.KEY_DB_LAST_UPLOAD_TIMESTAMP, 0L)
+                if (cloudInfo.modifiedTimeMs > lastUpload) {
+                    // Conflict detected: Cloud is newer than our last successful interaction.
+                    // Stop the background sync to avoid overwriting. User must resolve via UI.
+                    syncLogRepo.log(
+                        service = SyncLog.SERVICE_DRIVE,
+                        action = "Backup database",
+                        status = SyncLog.STATUS_SKIPPED,
+                        source = SyncLog.SOURCE_QUEUE,
+                        message = "Conflict detected: Newer data exists in the cloud. Open the app to resolve."
+                    )
+                    return Result.success()
+                }
+            }
+
             val dbFile = applicationContext.getDatabasePath("plan_my_plate_db")
             val cacheFile = File(applicationContext.cacheDir, "plan_my_plate_backup.db")
             
@@ -129,7 +150,7 @@ class DriveDbSyncWorker(
                 return Result.success()
             }
 
-            val success = DriveRepository(applicationContext).uploadDatabaseBackup()
+            val success = driveRepo.uploadDatabaseBackup()
 
             if (success) {
                 val now = System.currentTimeMillis()

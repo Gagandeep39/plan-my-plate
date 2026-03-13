@@ -69,7 +69,9 @@ class SyncCheckViewModel(
 
         val cloudInfo = driveRepository.getCloudBackupInfo()
         if (cloudInfo == null) {
-            // No backup on Drive yet — nothing to restore or conflict with
+            // No backup on Drive yet — nothing to restore or conflict with.
+            // However, we should trigger an initial backup of what we have.
+            userRepository.enqueueDbSyncForced()
             _state.value = SyncCheckState.Clear
             return
         }
@@ -95,17 +97,22 @@ class SyncCheckViewModel(
                 cloudTimestamp = cloudInfo.modifiedTimeMs
             )
         } else {
+            // Local is up to date or ahead of cloud. 
+            // Trigger a forced backup to ensure local changes are synced.
+            userRepository.enqueueDbSyncForced()
             _state.value = SyncCheckState.Clear
         }
     }
 
-    /** User chose to keep local data. Just record this and continue. */
+    /** User chose to keep local data. Record this and push to cloud. */
     fun keepLocal() {
-        // Update upload timestamp to match cloud so we stop detecting "conflict" on every restart
+        // Update upload timestamp to match cloud so we stop detecting "conflict"
         val now = System.currentTimeMillis()
         userRepository.recordUploadTimestamp(
             latestCloudTimestamp.coerceAtLeast(now)
         )
+        // Push local data to cloud immediately
+        userRepository.enqueueDbSyncForced()
         _state.value = SyncCheckState.Clear
     }
 

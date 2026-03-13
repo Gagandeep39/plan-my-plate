@@ -195,7 +195,9 @@ fun SettingsScreen(
                                     onNavigateToSyncCheck()
                                 }
                             },
-                            onSyncNow = { viewModel.syncDbNow() }
+                            onSyncNow = {
+                                onNavigateToSyncCheck()
+                            }
                         )
                     }
                 }
