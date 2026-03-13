@@ -65,6 +65,7 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
         }
     }
 
+    // Auto-scroll to bottom when a dish is added
     LaunchedEffect(uiState.dishes.size) {
         if (uiState.dishes.isNotEmpty()) {
             scrollState.animateScrollTo(scrollState.maxValue)
@@ -330,9 +331,21 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let {
-                        val cal = Calendar.getInstance().apply { timeInMillis = it }
-                        viewModel.onDateSelected(cal)
+                    datePickerState.selectedDateMillis?.let { utcMillis ->
+                        // The DatePicker returns UTC millis (Midnight UTC).
+                        // To get the same DATE in local time, we use a UTC calendar to extract
+                        // the day/month/year and apply them to a local calendar.
+                        val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+                            timeInMillis = utcMillis
+                        }
+                        
+                        val localCal = Calendar.getInstance().apply {
+                            set(Calendar.YEAR, utcCal.get(Calendar.YEAR))
+                            set(Calendar.MONTH, utcCal.get(Calendar.MONTH))
+                            set(Calendar.DAY_OF_MONTH, utcCal.get(Calendar.DAY_OF_MONTH))
+                        }
+                        
+                        viewModel.onDateSelected(localCal)
                     }
                     showDatePicker = false
                 }) { Text("OK") }
