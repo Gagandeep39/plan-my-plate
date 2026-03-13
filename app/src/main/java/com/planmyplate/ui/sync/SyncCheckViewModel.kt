@@ -36,7 +36,7 @@ class SyncCheckViewModel(
     private val context: Context,
     private val driveRepository: DriveRepository,
     private val userRepository: UserRepository,
-    private val isManualSync: Boolean = false
+    val isManualSync: Boolean = false
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<SyncCheckState>(SyncCheckState.Checking)

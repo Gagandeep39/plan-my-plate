@@ -30,7 +30,14 @@ fun SyncCheckScreen(
 
     when (val s = state) {
         is SyncCheckState.Checking, SyncCheckState.Skipped, SyncCheckState.Clear -> {
-            SyncLoadingScreen("Syncing…")
+            // During initial launch, we keep the splash screen on. 
+            // We avoid showing the loading spinner here to prevent a "flash" before navigating to Home.
+            if (viewModel.isManualSync) {
+                SyncLoadingScreen("Syncing…")
+            } else {
+                // Show nothing; the splash screen or the activity background is visible.
+                Box(Modifier.fillMaxSize())
+            }
         }
 
         is SyncCheckState.Restoring -> {
