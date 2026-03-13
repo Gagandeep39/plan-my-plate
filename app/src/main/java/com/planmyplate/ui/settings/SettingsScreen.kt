@@ -2,6 +2,7 @@ package com.planmyplate.ui.settings
 
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -27,12 +28,10 @@ fun SettingsScreen(onBack: () -> Unit) {
     val viewModel: SettingsViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
 
-    val signInLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
+    val authLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            viewModel.handleSignInResult(result.data)
-        }
+        viewModel.handleAuthorizationResult(context, result.resultCode == Activity.RESULT_OK)
     }
 
     LaunchedEffect(Unit) {
@@ -124,8 +123,9 @@ fun SettingsScreen(onBack: () -> Unit) {
                     } else {
                         Button(
                             onClick = { 
-                                val intent = viewModel.getSignInIntent(context)
-                                signInLauncher.launch(intent)
+                                viewModel.signIn(context) { pendingIntent ->
+                                    authLauncher.launch(IntentSenderRequest.Builder(pendingIntent).build())
+                                }
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {

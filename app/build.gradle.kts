@@ -82,6 +82,11 @@ dependencies {
     // WorkManager for background sync
     implementation(libs.androidx.work.runtime.ktx)
 
+    // Credential Manager
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+
     // Handles Google Sign-In and requesting Drive permissions
     implementation(libs.play.services.auth)
     // Core Google REST API clients for Android

@@ -2,7 +2,7 @@ package com.planmyplate.data.repository
 
 import android.content.Context
 import android.util.Log
-import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.identity.Identity
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.google.api.client.http.javanet.NetHttpTransport
@@ -20,11 +20,13 @@ import java.util.Collections
 class CalendarRepository(private val context: Context) {
 
     private fun getCalendarService(): Calendar? {
-        val account = GoogleSignIn.getLastSignedInAccount(context) ?: return null
+        val sharedPrefs = context.getSharedPreferences("plan_my_plate_prefs", Context.MODE_PRIVATE)
+        val userEmail = sharedPrefs.getString("user_email", null) ?: return null
+
         val credential = GoogleAccountCredential.usingOAuth2(
             context, Collections.singleton(CalendarScopes.CALENDAR)
         ).apply {
-            selectedAccount = account.account
+            selectedAccountName = userEmail
         }
 
         return Calendar.Builder(
@@ -55,7 +57,7 @@ class CalendarRepository(private val context: Context) {
             description = (mealSession.notes?.let { "\nNotes: $it" } ?: "")
             
             val start = DateTime(mealSession.scheduledTimestamp)
-            val end = DateTime(mealSession.scheduledTimestamp + 1800000) // 1 hour duration
+            val end = DateTime(mealSession.scheduledTimestamp + 1800000)
             
             setStart(EventDateTime().setDateTime(start))
             setEnd(EventDateTime().setDateTime(end))

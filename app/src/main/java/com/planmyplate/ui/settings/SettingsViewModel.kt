@@ -1,19 +1,25 @@
 package com.planmyplate.ui.settings
 
 import android.content.Context
-import android.content.Intent
 import android.util.Log
+import androidx.credentials.ClearCredentialStateRequest
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
 import androidx.lifecycle.ViewModel
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
+import androidx.lifecycle.viewModelScope
+import com.google.android.gms.auth.api.identity.AuthorizationRequest
+import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.common.api.Scope
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.api.services.calendar.CalendarScopes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class SettingsUiState(
     val isGoogleConnected: Boolean = false,
@@ -29,62 +35,99 @@ class SettingsViewModel : ViewModel() {
     private val calendarScope = Scope(CalendarScopes.CALENDAR)
 
     fun checkGoogleConnection(context: Context) {
-        val account = GoogleSignIn.getLastSignedInAccount(context)
-        val hasCalendarScope = account != null && GoogleSignIn.hasPermissions(account, calendarScope)
+        val sharedPrefs = context.getSharedPreferences("plan_my_plate_prefs", Context.MODE_PRIVATE)
+        val savedEmail = sharedPrefs.getString("user_email", null)
+        val isAuthorized = sharedPrefs.getBoolean("calendar_authorized", false)
         
         _uiState.update { 
             it.copy(
-                isGoogleConnected = hasCalendarScope,
-                userEmail = account?.email,
+                isGoogleConnected = savedEmail != null && isAuthorized,
+                userEmail = savedEmail,
                 error = null
             )
         }
     }
 
-    fun getSignInIntent(context: Context): Intent {
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestEmail()
-            .requestScopes(calendarScope)
+    fun signIn(context: Context, onAuthResolutionRequired: (android.app.PendingIntent) -> Unit) {
+        val credentialManager = CredentialManager.create(context)
+        
+        val serverClientId = "468906434207-oj1asrjtq2htvbch6dls24vg4an7gs6g.apps.googleusercontent.com"
+
+        val googleIdOption = GetGoogleIdOption.Builder()
+            .setFilterByAuthorizedAccounts(false)
+            .setServerClientId(serverClientId)
+            .setAutoSelectEnabled(true)
             .build()
-        val client = GoogleSignIn.getClient(context, gso)
-        return client.signInIntent
+
+        val request = GetCredentialRequest.Builder()
+            .addCredentialOption(googleIdOption)
+            .build()
+
+        viewModelScope.launch {
+            try {
+                val result = credentialManager.getCredential(context, request)
+                val credential = result.credential
+                
+                if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                    val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                    val email = googleIdTokenCredential.id
+                    
+                    context.getSharedPreferences("plan_my_plate_prefs", Context.MODE_PRIVATE)
+                        .edit().putString("user_email", email).apply()
+
+                    requestCalendarAuthorization(context, onAuthResolutionRequired)
+                }
+            } catch (e: GetCredentialException) {
+                Log.e("SettingsViewModel", "Credential Manager error", e)
+                _uiState.update { it.copy(error = "Sign-in failed: ${e.message}") }
+            }
+        }
     }
 
-    fun handleSignInResult(data: Intent?) {
-        val task = GoogleSignIn.getSignedInAccountFromIntent(data)
-        try {
-            val account = task.getResult(ApiException::class.java)
-            val hasCalendarScope = GoogleSignIn.hasPermissions(account, calendarScope)
-            
-            if (account != null && hasCalendarScope) {
-                _uiState.update { 
-                    it.copy(
-                        isGoogleConnected = true,
-                        userEmail = account.email,
-                        error = null
-                    )
+    private fun requestCalendarAuthorization(context: Context, onResolutionRequired: (android.app.PendingIntent) -> Unit) {
+        val authorizationRequest = AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(calendarScope))
+            .build()
+
+        Identity.getAuthorizationClient(context)
+            .authorize(authorizationRequest)
+            .addOnSuccessListener { authorizationResult ->
+                if (authorizationResult.hasResolution()) {
+                    authorizationResult.pendingIntent?.let { onResolutionRequired(it) }
+                } else {
+                    context.getSharedPreferences("plan_my_plate_prefs", Context.MODE_PRIVATE)
+                        .edit().putBoolean("calendar_authorized", true).apply()
+                    _uiState.update { it.copy(isGoogleConnected = true) }
                 }
-            } else if (account != null && !hasCalendarScope) {
-                _uiState.update { it.copy(error = "Calendar access was not granted. Please try again and accept all permissions.") }
             }
-        } catch (e: ApiException) {
-            val message = when (e.statusCode) {
-                10 -> "Developer Error (10): Ensure your SHA-1 fingerprint is registered in the Google Cloud Console."
-                7 -> "Network Error: Check your internet connection."
-                12500 -> "Sign-in Failed (12500): Common issue with configuration or play services."
-                12501 -> "Sign-in Cancelled"
-                else -> "Sign-in failed: ${e.statusCode}. ${e.message}"
+            .addOnFailureListener { e ->
+                Log.e("SettingsViewModel", "Authorization failed", e)
+                _uiState.update { it.copy(error = "Calendar access denied") }
             }
-            Log.e("SettingsViewModel", message, e)
-            _uiState.update { it.copy(error = message) }
+    }
+
+    fun handleAuthorizationResult(context: Context, success: Boolean) {
+        if (success) {
+            context.getSharedPreferences("plan_my_plate_prefs", Context.MODE_PRIVATE)
+                .edit().putBoolean("calendar_authorized", true).apply()
+            checkGoogleConnection(context)
+        } else {
+            _uiState.update { it.copy(error = "Authorization cancelled or failed") }
         }
     }
 
     fun disconnectGoogle(context: Context, onDone: () -> Unit) {
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
-        val client = GoogleSignIn.getClient(context, gso)
-        client.signOut().addOnCompleteListener {
-            _uiState.update { it.copy(isGoogleConnected = false, userEmail = null, error = null) }
+        viewModelScope.launch {
+            val credentialManager = CredentialManager.create(context)
+            credentialManager.clearCredentialState(ClearCredentialStateRequest())
+            
+            context.getSharedPreferences("plan_my_plate_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .remove("user_email")
+                .remove("calendar_authorized")
+                .apply()
+                
+            _uiState.update { it.copy(isGoogleConnected = false, userEmail = null) }
             onDone()
         }
     }
