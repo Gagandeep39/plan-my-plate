@@ -87,7 +87,7 @@ fun AddMealCard(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            // Removed bottom spacer to eliminate extra space after Add button
         }
     }
 }

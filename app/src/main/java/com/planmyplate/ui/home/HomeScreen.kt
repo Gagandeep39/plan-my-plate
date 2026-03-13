@@ -32,7 +32,19 @@ fun HomeScreen(
         factory = TimelineViewModelFactory(app.mealRepository)
     )
     
-    val dayPlans by viewModel.timelineState.collectAsState()
+    val rawDayPlans by viewModel.timelineState.collectAsState()
+    // Ensure today's plan is always at the front
+    val dayPlans = remember(rawDayPlans) {
+        val todayIndex = rawDayPlans.indexOfFirst { it.isToday }
+        if (todayIndex > 0) {
+            val mutable = rawDayPlans.toMutableList()
+            val today = mutable.removeAt(todayIndex)
+            mutable.add(0, today)
+            mutable.toList()
+        } else {
+            rawDayPlans
+        }
+    }
     val selectedMealIds by viewModel.selectedMealIds.collectAsState()
     val listState = rememberLazyListState()
 

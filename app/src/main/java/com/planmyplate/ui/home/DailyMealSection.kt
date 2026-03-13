@@ -25,9 +25,7 @@ fun LazyListScope.DailyMealSection(
         )
     }
 
-    item {
-        Spacer(modifier = Modifier.height(8.dp))
-    }
+    // Removed top spacer to eliminate space above first meal card
 
     // Adding stable keys to meal items is crucial for smooth scrolling and animations
     itemsIndexed(
