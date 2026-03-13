@@ -31,12 +31,15 @@ data class SettingsUiState(
     val isSyncing: Boolean = false
 )
 
+private enum class AuthStep { SIGN_IN, DRIVE_ONLY }
+
 class SettingsViewModel(private val userRepository: UserRepository) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     private val calendarScope = Scope(CalendarScopes.CALENDAR)
     private val driveScope = Scope(DriveScopes.DRIVE_APPDATA)
+    private var currentAuthStep = AuthStep.SIGN_IN
 
     init {
         viewModelScope.launch {
@@ -89,8 +92,9 @@ class SettingsViewModel(private val userRepository: UserRepository) : ViewModel(
     }
 
     private fun requestCalendarAuthorization(context: Context, onResolutionRequired: (android.app.PendingIntent) -> Unit) {
+        currentAuthStep = AuthStep.SIGN_IN
         val authorizationRequest = AuthorizationRequest.builder()
-            .setRequestedScopes(listOf(calendarScope))
+            .setRequestedScopes(listOf(calendarScope, driveScope))
             .build()
 
         Identity.getAuthorizationClient(context)
@@ -100,6 +104,7 @@ class SettingsViewModel(private val userRepository: UserRepository) : ViewModel(
                     authorizationResult.pendingIntent?.let { onResolutionRequired(it) }
                 } else {
                     userRepository.setCalendarAuthorized(true)
+                    userRepository.setDriveAuthorized(true)
                 }
             }
             .addOnFailureListener { e ->
@@ -109,6 +114,7 @@ class SettingsViewModel(private val userRepository: UserRepository) : ViewModel(
     }
 
     fun connectDrive(context: Context, onResolutionRequired: (android.app.PendingIntent) -> Unit) {
+        currentAuthStep = AuthStep.DRIVE_ONLY
         val authorizationRequest = AuthorizationRequest.builder()
             .setRequestedScopes(listOf(driveScope))
             .build()
@@ -129,16 +135,16 @@ class SettingsViewModel(private val userRepository: UserRepository) : ViewModel(
     }
 
     fun handleAuthorizationResult(success: Boolean) {
-        // Since we might be authorizing multiple things, we check the current state
-        // and update accordingly. In a more robust implementation, we'd track WHICH 
-        // request triggered the result. For now, we'll refresh both status.
         if (success) {
-            // We assume if it returned successfully from an intent, at least one was granted
-            // We can't easily know which one without tracking request codes, 
-            // so we'll just check what the user was likely trying to do.
-            // For simplicity, we'll try to set both or the one that is currently missing.
-            if (!_uiState.value.isGoogleConnected) userRepository.setCalendarAuthorized(true)
-            else userRepository.setDriveAuthorized(true)
+            when (currentAuthStep) {
+                AuthStep.SIGN_IN -> {
+                    userRepository.setCalendarAuthorized(true)
+                    userRepository.setDriveAuthorized(true)
+                }
+                AuthStep.DRIVE_ONLY -> {
+                    userRepository.setDriveAuthorized(true)
+                }
+            }
         } else {
             _uiState.update { it.copy(error = "Authorization cancelled or failed") }
         }
