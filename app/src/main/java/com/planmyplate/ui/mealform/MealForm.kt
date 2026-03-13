@@ -1,10 +1,10 @@
 package com.planmyplate.ui.mealform
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -18,9 +18,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -40,6 +42,8 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
     )
     val uiState by viewModel.uiState.collectAsState()
 
+    val scrollState = rememberScrollState()
+    
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = uiState.date.timeInMillis
@@ -56,6 +60,13 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
     LaunchedEffect(uiState.isSaved, uiState.isDeleted) {
         if (uiState.isSaved || uiState.isDeleted) {
             onBack()
+        }
+    }
+
+    // Auto-scroll to bottom when a dish is added
+    LaunchedEffect(uiState.dishes.size) {
+        if (uiState.dishes.isNotEmpty()) {
+            scrollState.animateScrollTo(scrollState.maxValue)
         }
     }
 
@@ -76,16 +87,35 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                     }
                 }
             )
+        },
+        bottomBar = {
+            Surface(
+                tonalElevation = 3.dp,
+                shadowElevation = 8.dp
+            ) {
+                Box(modifier = Modifier.padding(16.dp).navigationBarsPadding()) {
+                    Button(
+                        onClick = { viewModel.saveMeal() },
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        enabled = uiState.dishes.isNotEmpty() || uiState.currentDishName.isNotBlank(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(if (sessionId == null) "Schedule Meal" else "Update Meal", style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
         }
     ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
-                .padding(20.dp)
+                .padding(horizontal = 20.dp)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+            Spacer(modifier = Modifier.height(8.dp))
+
             // Date Selection
             OutlinedCard(
                 onClick = { showDatePicker = true },
@@ -96,7 +126,11 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(
+                        Icons.Default.CalendarMonth, 
+                        contentDescription = null, 
+                        tint = MaterialTheme.colorScheme.primary
+                    )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
                         Text("Date", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
@@ -126,7 +160,6 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                                 Text(
                                     type.name.lowercase().replaceFirstChar { it.uppercase() },
                                     maxLines = 1,
-                                    overflow = TextOverflow.Clip,
                                     fontSize = 14.sp 
                                 ) 
                             }
@@ -145,7 +178,11 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(
+                        Icons.Default.Schedule, 
+                        contentDescription = null, 
+                        tint = MaterialTheme.colorScheme.primary
+                    )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
                         Text("Time", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
@@ -168,53 +205,63 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                 OutlinedTextField(
                     value = uiState.currentDishName,
                     onValueChange = { viewModel.onDishNameChanged(it) },
-                    label = { Text("Dish Name") },
+                    label = { Text("Add Dish") },
                     modifier = Modifier.fillMaxWidth(),
-                    leadingIcon = { Icon(Icons.Default.Restaurant, contentDescription = null) },
+                    leadingIcon = { 
+                        Icon(
+                            Icons.Default.Restaurant, 
+                            contentDescription = null, 
+                            tint = MaterialTheme.colorScheme.primary
+                        ) 
+                    },
                     trailingIcon = {
-                        IconButton(onClick = { viewModel.addDish() }) {
-                            Icon(Icons.Default.Add, contentDescription = "Add Dish")
+                        if (uiState.currentDishName.isNotBlank()) {
+                            IconButton(onClick = { viewModel.addDish() }) {
+                                Icon(
+                                    Icons.Default.Add, 
+                                    contentDescription = "Add Dish",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = { 
+                            if (uiState.currentDishName.isNotBlank()) {
+                                viewModel.addDish()
+                            }
+                        }
+                    )
                 )
 
                 if (uiState.dishes.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        uiState.dishes.forEach { dish ->
-                            Surface(
-                                onClick = { viewModel.removeDish(dish) },
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                border = null,
-                                shadowElevation = 1.dp
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        dish, 
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    uiState.dishes.forEach { dish ->
+                        ListItem(
+                            headlineContent = { Text(dish, fontWeight = FontWeight.Medium) },
+                            trailingContent = {
+                                IconButton(onClick = { viewModel.removeDish(dish) }) {
                                     Icon(
-                                        Icons.Default.Close,
+                                        Icons.Default.Close, 
                                         contentDescription = "Remove",
-                                        modifier = Modifier.size(20.dp)
+                                        tint = MaterialTheme.colorScheme.primary
                                     )
                                 }
-                            }
-                        }
+                            },
+                            colors = ListItemDefaults.colors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
+                                headlineColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier
+                                .padding(vertical = 2.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
                     }
                 }
             }
@@ -227,18 +274,23 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
                 placeholder = { Text("e.g. Low carb, extra protein...") },
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences
+                ),
+                leadingIcon = {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack, // Placeholder icon or similar
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(0.dp) // Hide but keep spacing consistent if needed
+                    )
+                }
             )
-
-            // Submit Button
-            Button(
-                onClick = { viewModel.saveMeal() },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = uiState.dishes.isNotEmpty() || uiState.currentDishName.isNotBlank(),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(if (sessionId == null) "Schedule Meal" else "Update Meal")
-            }
+            
+            // Remove the notes leading icon hack and just use standard
+            
+            Spacer(modifier = Modifier.height(120.dp)) // Extra space for keyboard and bottom bar
         }
     }
 
