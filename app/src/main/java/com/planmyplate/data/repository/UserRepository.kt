@@ -35,12 +35,14 @@ class UserRepository(private val context: Context) {
     }
 
     suspend fun logout() {
-        val credentialManager = CredentialManager.create(context)
-        credentialManager.clearCredentialState(ClearCredentialStateRequest())
+        // Clear local state immediately so the UI updates right away
         sharedPrefs.edit().clear().apply()
         _userEmail.value = null
         _isCalendarAuthorized.value = false
         _isDriveAuthorized.value = false
+        // Credential manager clear is slow — run it after UI state is already updated
+        val credentialManager = CredentialManager.create(context)
+        credentialManager.clearCredentialState(ClearCredentialStateRequest())
     }
 
     fun isLoggedIn(): Boolean = userEmail.value != null
