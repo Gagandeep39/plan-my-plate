@@ -37,7 +37,7 @@ fun LazyListScope.DailyMealSection(
         MealCard(
             meal = meal,
             isFirst = index == 0,
-            isLast = index == dayPlan.meals.lastIndex,
+            isLast = false,
             isSelected = selectedMealIds.contains(meal.id),
             onClick = { 
                 if (selectedMealIds.isNotEmpty()) {
