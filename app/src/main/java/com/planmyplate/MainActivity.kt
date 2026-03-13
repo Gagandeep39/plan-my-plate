@@ -12,6 +12,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.planmyplate.ui.home.HomeScreen
 import com.planmyplate.ui.mealform.MealForm
+import com.planmyplate.ui.settings.SettingsScreen
 import com.planmyplate.ui.theme.PlanMyPlateTheme
 
 class MainActivity : ComponentActivity() {
@@ -37,8 +38,14 @@ fun AppNavigation() {
                 },
                 onEditMeal = { sessionId ->
                     navController.navigate("meal_form?sessionId=$sessionId")
+                },
+                onOpenSettings = {
+                    navController.navigate("settings")
                 }
             )
+        }
+        composable("settings") {
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
         composable(
             route = "meal_form?sessionId={sessionId}",

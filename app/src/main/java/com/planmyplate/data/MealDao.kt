@@ -2,6 +2,7 @@ package com.planmyplate.data
 
 import androidx.room.*
 import com.planmyplate.model.Dish
+import com.planmyplate.model.MealCalendarMapping
 import com.planmyplate.model.MealSession
 import com.planmyplate.model.MealWithDishes
 import kotlinx.coroutines.flow.Flow
@@ -20,4 +21,13 @@ interface MealDao {
 
     @Delete
     suspend fun deleteSession(session: MealSession)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCalendarMapping(mapping: MealCalendarMapping)
+
+    @Query("SELECT calendarEventId FROM meal_calendar_mappings WHERE sessionId = :sessionId")
+    suspend fun getCalendarEventId(sessionId: Long): String?
+
+    @Query("DELETE FROM meal_calendar_mappings WHERE sessionId = :sessionId")
+    suspend fun deleteCalendarMapping(sessionId: Long)
 }

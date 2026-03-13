@@ -4,6 +4,7 @@ coreKtx = "1.18.0"
 coroutinesVersion = "1.10.2"
 googleApiClientAndroid = "2.9.0"
 googleApiServicesDrive = "v3-rev20230822-2.0.0"
+googleApiServicesCalendar = "v3-rev20260225-2.0.0"
 googleHttpClientGson = "2.1.0"
 junit = "4.13.2"
 junitVersion = "1.1.5"
@@ -28,6 +29,7 @@ androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomVers
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomVersion" }
 google-api-client-android = { module = "com.google.api-client:google-api-client-android", version.ref = "googleApiClientAndroid" }
 google-api-services-drive = { module = "com.google.apis:google-api-services-drive", version.ref = "googleApiServicesDrive" }
+google-api-services-calendar = { module = "com.google.apis:google-api-services-calendar", version.ref = "googleApiServicesCalendar" }
 google-http-client-gson = { module = "com.google.http-client:google-http-client-gson", version.ref = "googleHttpClientGson" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

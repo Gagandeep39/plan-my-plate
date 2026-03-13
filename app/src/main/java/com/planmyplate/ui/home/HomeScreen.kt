@@ -3,6 +3,8 @@ package com.planmyplate.ui.home
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -10,14 +12,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.planmyplate.data.AppDatabase
+import com.planmyplate.data.repository.CalendarRepository
 import com.planmyplate.data.repository.MealRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onAddMeal: () -> Unit, onEditMeal: (Long) -> Unit) {
+fun HomeScreen(
+    onAddMeal: () -> Unit, 
+    onEditMeal: (Long) -> Unit,
+    onOpenSettings: () -> Unit
+) {
     val context = LocalContext.current
     val database = remember { AppDatabase.getDatabase(context) }
-    val repository = remember { MealRepository(database.mealDao()) }
+    val calendarRepository = remember { CalendarRepository(context) }
+    val repository = remember { MealRepository(database.mealDao(), calendarRepository) }
     val viewModel: TimelineViewModel = viewModel(
         factory = TimelineViewModelFactory(repository)
     )
@@ -31,7 +39,6 @@ fun HomeScreen(onAddMeal: () -> Unit, onEditMeal: (Long) -> Unit) {
             if (todayIndex != -1) {
                 var scrollTarget = 0
                 for (i in 0 until todayIndex) {
-                    // Approximate item count per section
                     scrollTarget += 1 + 1 + dayPlans[i].meals.size + 1
                 }
                 listState.scrollToItem(scrollTarget)
@@ -47,6 +54,11 @@ fun HomeScreen(onAddMeal: () -> Unit, onEditMeal: (Long) -> Unit) {
                         "Plan My Plate",
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
                     )
+                },
+                actions = {
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
                 }
             )
         }

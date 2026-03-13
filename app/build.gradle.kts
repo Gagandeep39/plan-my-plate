@@ -44,6 +44,7 @@ android {
         resources {
             excludes += setOf(
                 "META-INF/DEPENDENCIES",
+                "META-INF/INDEX.LIST",
                 "META-INF/LICENSE",
                 "META-INF/LICENSE.txt",
                 "META-INF/license.txt",
@@ -84,6 +85,8 @@ dependencies {
     implementation(libs.google.api.client.android)
     // The specific Google Drive API (v3)
     implementation(libs.google.api.services.drive)
+    // Google Calendar API
+    implementation(libs.google.api.services.calendar)
     // JSON parser required by the Google HTTP Client
     implementation(libs.google.http.client.gson)
 

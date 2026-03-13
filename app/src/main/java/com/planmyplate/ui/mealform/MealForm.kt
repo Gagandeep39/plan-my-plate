@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.planmyplate.data.AppDatabase
+import com.planmyplate.data.repository.CalendarRepository
 import com.planmyplate.data.repository.MealRepository
 import com.planmyplate.model.MealType
 import java.text.SimpleDateFormat
@@ -33,7 +34,9 @@ import java.util.*
 fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
     val context = LocalContext.current
     val database = remember { AppDatabase.getDatabase(context) }
-    val repository = remember { MealRepository(database.mealDao()) }
+    val calendarRepository = remember { CalendarRepository(context) }
+    val repository = remember { MealRepository(database.mealDao(), calendarRepository) }
+
     val viewModel: MealFormViewModel = viewModel(
         factory = MealFormViewModelFactory(repository, sessionId)
     )
