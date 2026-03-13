@@ -1,6 +1,7 @@
 package com.planmyplate.ui.settings
 
 import android.content.Context
+import android.util.Base64
 import android.util.Log
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 data class SettingsUiState(
     val isGoogleConnected: Boolean = false,
@@ -50,6 +52,17 @@ class SettingsViewModel(
     private val calendarScope = Scope(CalendarScopes.CALENDAR)
     private val driveScope = Scope(DriveScopes.DRIVE_FILE)
     private var currentAuthStep = AuthStep.SIGN_IN
+
+    private fun extractEmailFromIdToken(idToken: String?): String? {
+        if (idToken.isNullOrBlank()) return null
+        return try {
+            val payloadPart = idToken.split(".").getOrNull(1) ?: return null
+            val payload = String(Base64.decode(payloadPart, Base64.URL_SAFE or Base64.DEFAULT))
+            JSONObject(payload).optString("email").takeIf { it.contains("@") }
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     private fun normalizeDriveLink(link: String): String {
         val regex = Regex("/file/d/([^/]+)")
@@ -81,16 +94,6 @@ class SettingsViewModel(
         viewModelScope.launch {
             userRepository.isDriveAuthorized.collect { authorized ->
                 _uiState.update { it.copy(isDriveConnected = authorized) }
-                if (authorized) {
-                    if (userRepository.sharableLink.value == null) {
-                        // No cached link — fetch for the first time (shows loading UI)
-                        refreshDriveLink()
-                    } else {
-                        // Cached link exists — show it immediately, then silently verify
-                        // the file still exists on Drive (handles external deletion)
-                        silentlyVerifyDriveLink()
-                    }
-                }
             }
         }
         viewModelScope.launch {
@@ -126,7 +129,16 @@ class SettingsViewModel(
                 
                 if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                    userRepository.saveUser(googleIdTokenCredential.id)
+                    val email = extractEmailFromIdToken(googleIdTokenCredential.idToken)
+                        ?: googleIdTokenCredential.id.takeIf { it.contains("@") }
+                        ?: credential.data.getString("email")?.takeIf { it.contains("@") }
+                    if (email != null) {
+                        userRepository.saveUser(email)
+                    } else {
+                        userRepository.setCalendarAuthorized(false)
+                        userRepository.setDriveAuthorized(false)
+                        _uiState.update { it.copy(error = "Google account email unavailable. Disconnect and connect again.") }
+                    }
                 }
             } catch (e: GetCredentialException) {
                 Log.e("SettingsViewModel", "Credential Manager error", e)
@@ -169,8 +181,6 @@ class SettingsViewModel(
                     authorizationResult.pendingIntent?.let { onResolutionRequired(it) }
                 } else {
                     userRepository.setDriveAuthorized(true)
-                    userRepository.enqueueDriveExportSync()
-                    // refreshDriveLink() is called by the init collector reacting to isDriveAuthorized
                 }
             }
             .addOnFailureListener { e ->
@@ -185,8 +195,6 @@ class SettingsViewModel(
                 AuthStep.CALENDAR_ONLY -> userRepository.setCalendarAuthorized(true)
                 AuthStep.DRIVE_ONLY -> {
                     userRepository.setDriveAuthorized(true)
-                    userRepository.enqueueDriveExportSync()
-                    // refreshDriveLink() is called by the init collector reacting to isDriveAuthorized
                 }
                 else -> {}
             }

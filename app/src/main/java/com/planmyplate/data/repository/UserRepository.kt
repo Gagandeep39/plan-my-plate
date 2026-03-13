@@ -24,8 +24,10 @@ class UserRepository(private val context: Context) {
     }
 
     private val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private fun sanitizeEmail(value: String?): String? =
+        value?.trim()?.takeIf { it.contains("@") }
     
-    private val _userEmail = MutableStateFlow(sharedPrefs.getString(KEY_USER_EMAIL, null))
+    private val _userEmail = MutableStateFlow(sanitizeEmail(sharedPrefs.getString(KEY_USER_EMAIL, null)))
     val userEmail: StateFlow<String?> = _userEmail.asStateFlow()
 
     private val _isCalendarAuthorized = MutableStateFlow(sharedPrefs.getBoolean(KEY_CALENDAR_AUTHORIZED, false))
@@ -40,9 +42,16 @@ class UserRepository(private val context: Context) {
     private val _isDbSyncEnabled = MutableStateFlow(sharedPrefs.getBoolean(KEY_DB_SYNC_ENABLED, false))
     val isDbSyncEnabled: StateFlow<Boolean> = _isDbSyncEnabled.asStateFlow()
 
+    init {
+        if (sharedPrefs.getString(KEY_USER_EMAIL, null) != _userEmail.value) {
+            sharedPrefs.edit().putString(KEY_USER_EMAIL, _userEmail.value).apply()
+        }
+    }
+
     fun saveUser(email: String) {
-        sharedPrefs.edit().putString(KEY_USER_EMAIL, email).apply()
-        _userEmail.value = email
+        val safeEmail = sanitizeEmail(email) ?: return
+        sharedPrefs.edit().putString(KEY_USER_EMAIL, safeEmail).commit()
+        _userEmail.value = safeEmail
     }
 
     fun setCalendarAuthorized(authorized: Boolean) {

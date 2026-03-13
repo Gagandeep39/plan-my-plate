@@ -1,6 +1,8 @@
 package com.planmyplate.data.repository
 
+import android.accounts.Account
 import android.content.Context
+import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.http.FileContent
 import com.google.api.client.http.javanet.NetHttpTransport
@@ -25,6 +27,28 @@ import java.util.TimeZone
 
 class DriveRepository(private val context: Context) {
 
+    private fun resolveGoogleAccount(): Account? {
+        val sharedPrefs = context.getSharedPreferences(UserRepository.PREFS_NAME, Context.MODE_PRIVATE)
+
+        val signedInAccount = GoogleSignIn.getLastSignedInAccount(context)?.account
+        if (signedInAccount?.name?.isNotBlank() == true) {
+            sharedPrefs.edit().putString(UserRepository.KEY_USER_EMAIL, signedInAccount.name).apply()
+            return signedInAccount
+        }
+
+        val emailFromPrefs = sharedPrefs
+            .getString(UserRepository.KEY_USER_EMAIL, null)
+            ?.trim()
+            ?.takeIf { it.contains("@") }
+            ?: return null
+
+        return try {
+            Account(emailFromPrefs, "com.google")
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private suspend fun insertSyncLog(
         action: String,
         status: String,
@@ -48,17 +72,12 @@ class DriveRepository(private val context: Context) {
 
     private fun getDriveService(): Drive? {
         return try {
-            val sharedPrefs = context.getSharedPreferences(UserRepository.PREFS_NAME, Context.MODE_PRIVATE)
-            val userEmail = sharedPrefs
-                .getString(UserRepository.KEY_USER_EMAIL, null)
-                ?.trim()
-                ?.takeIf { it.isNotEmpty() }
-                ?: return null
+            val account = resolveGoogleAccount() ?: return null
 
             val credential = GoogleAccountCredential.usingOAuth2(
                 context, Collections.singleton(DriveScopes.DRIVE_FILE)
             ).apply {
-                selectedAccountName = userEmail
+                selectedAccount = account
             }
 
             Drive.Builder(
