@@ -67,16 +67,37 @@ fun SettingsScreen(onBack: () -> Unit) {
                 .fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Synchronization", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-            
-            // Primary Account Card
-            OutlinedCard(
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            OutlinedCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Column {
+                            Text(
+                                "Synchronization",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                "Connect your Google services for backup and scheduling",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    HorizontalDivider()
+
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -85,7 +106,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             imageVector = Icons.Default.AccountCircle,
                             contentDescription = null,
                             modifier = Modifier.size(32.dp),
-                            tint = if (uiState.userEmail != null) MaterialTheme.colorScheme.primary else Color.Gray
+                            tint = if (uiState.userEmail != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -96,11 +117,15 @@ fun SettingsScreen(onBack: () -> Unit) {
                             Text(
                                 uiState.userEmail ?: "Not connected",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (uiState.userEmail != null) MaterialTheme.colorScheme.onSurfaceVariant else Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         if (uiState.userEmail != null) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = "Connected", tint = Color(0xFF4CAF50))
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = "Connected",
+                                tint = MaterialTheme.colorScheme.tertiary
+                            )
                         }
                     }
 
@@ -114,44 +139,47 @@ fun SettingsScreen(onBack: () -> Unit) {
                             Text("Connect Google Account")
                         }
                     } else {
-                        Button(
+                        OutlinedButton(
                             onClick = { viewModel.disconnectGoogle { } },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer)
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                         ) {
                             Text("Disconnect Account")
                         }
+
+                        HorizontalDivider()
+
+                        Text(
+                            "Services",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        ServiceCard(
+                            title = "Google Calendar",
+                            description = "Sync meals to your personal calendar",
+                            isConnected = uiState.isGoogleConnected,
+                            onConnect = {
+                                viewModel.connectCalendar(context) { pendingIntent ->
+                                    authLauncher.launch(IntentSenderRequest.Builder(pendingIntent).build())
+                                }
+                            },
+                            onDisconnect = { viewModel.disconnectCalendar() }
+                        )
+
+                        DriveCard(
+                            uiState = uiState,
+                            onConnect = {
+                                viewModel.connectDrive(context) { pendingIntent ->
+                                    authLauncher.launch(IntentSenderRequest.Builder(pendingIntent).build())
+                                }
+                            },
+                            onDisconnect = { viewModel.disconnectDrive() },
+                            onRefreshLink = { viewModel.refreshDriveLink() }
+                        )
                     }
                 }
-            }
-
-            if (uiState.userEmail != null) {
-                Text("Services", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                
-                // Google Calendar Service
-                ServiceCard(
-                    title = "Google Calendar",
-                    description = "Sync meals to your personal calendar",
-                    isConnected = uiState.isGoogleConnected,
-                    onConnect = {
-                        viewModel.connectCalendar(context) { pendingIntent ->
-                            authLauncher.launch(IntentSenderRequest.Builder(pendingIntent).build())
-                        }
-                    },
-                    onDisconnect = { viewModel.disconnectCalendar() }
-                )
-
-                // Google Drive Service
-                DriveCard(
-                    uiState = uiState,
-                    onConnect = {
-                        viewModel.connectDrive(context) { pendingIntent ->
-                            authLauncher.launch(IntentSenderRequest.Builder(pendingIntent).build())
-                        }
-                    },
-                    onDisconnect = { viewModel.disconnectDrive() },
-                    onRefreshLink = { viewModel.refreshDriveLink() }
-                )
             }
 
             uiState.error?.let { errorMsg ->
@@ -175,7 +203,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 "App Version: 1.0.0",
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -202,11 +230,11 @@ fun DriveCard(
                 Icon(
                     Icons.Default.Cloud,
                     contentDescription = null,
-                    tint = if (uiState.isDriveConnected) MaterialTheme.colorScheme.primary else Color.Gray
+                    tint = if (uiState.isDriveConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Google Drive", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                    Text("Backup and share meal data", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    Text("Backup and share meal data", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (uiState.isDriveConnected) {
                     TextButton(
@@ -235,7 +263,7 @@ fun DriveCard(
                         )
                         Column {
                             Text("Share Meal Plan", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                            Text("Public link to view your current meal plan", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            Text("Public link to view your current meal plan", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     if (uiState.isLoadingLink) {
@@ -290,7 +318,7 @@ fun DriveCard(
                         Icons.Default.Backup,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),
-                        tint = Color.Gray
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Row(
@@ -301,7 +329,7 @@ fun DriveCard(
                                 "Cloud Sync",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Surface(
                                 color = MaterialTheme.colorScheme.secondaryContainer,
@@ -315,7 +343,7 @@ fun DriveCard(
                                 )
                             }
                         }
-                        Text("Automatically back up meals to Drive", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        Text("Automatically back up meals to Drive", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(checked = false, onCheckedChange = null, enabled = false)
                 }
@@ -343,11 +371,11 @@ fun ServiceCard(
             Icon(
                 imageVector = if (title.contains("Drive")) Icons.Default.Cloud else Icons.Default.Sync,
                 contentDescription = null,
-                tint = if (isConnected) MaterialTheme.colorScheme.primary else Color.Gray
+                tint = if (isConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                Text(description, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (isConnected) {
                 TextButton(
