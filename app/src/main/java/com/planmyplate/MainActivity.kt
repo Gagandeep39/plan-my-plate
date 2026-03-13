@@ -67,14 +67,7 @@ fun AppNavigation() {
         popExitTransition = NavTransitions.popExitTransition
     ) {
         composable(
-            route = "timeline",
-            enterTransition = {
-                if (initialState.destination.route?.startsWith("sync_check") == true) {
-                    fadeIn(animationSpec = tween(250))
-                } else {
-                    NavTransitions.enterTransition(this)
-                }
-            }
+            route = "timeline"
         ) {
             HomeScreen(
                 onAddMeal = {
@@ -95,15 +88,7 @@ fun AppNavigation() {
                     type = NavType.BoolType
                     defaultValue = false
                 }
-            ),
-            enterTransition = { EnterTransition.None },
-            exitTransition = { 
-                if (targetState.destination.route == "timeline") {
-                    fadeOut(animationSpec = tween(250))
-                } else {
-                    NavTransitions.exitTransition(this)
-                }
-            }
+            )
         ) { backStackEntry ->
             val fromSettings = backStackEntry.arguments?.getBoolean("fromSettings") ?: false
             val activity = (LocalContext.current as? android.app.Activity)
