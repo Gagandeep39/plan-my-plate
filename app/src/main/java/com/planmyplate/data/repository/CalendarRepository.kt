@@ -2,7 +2,6 @@ package com.planmyplate.data.repository
 
 import android.content.Context
 import android.util.Log
-import com.google.android.gms.auth.api.identity.Identity
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.google.api.client.http.javanet.NetHttpTransport
@@ -36,82 +35,64 @@ class CalendarRepository(private val context: Context) {
         ).setApplicationName("Plan My Plate").build()
     }
 
-    suspend fun findExistingEventId(sessionId: Long): String? = withContext(Dispatchers.IO) {
-        val service = getCalendarService() ?: return@withContext null
-        try {
-            // Search for events with our custom property
-            val events = service.events().list("primary")
-                .setPrivateExtendedProperty(listOf("planMyPlateSessionId=$sessionId"))
-                .execute()
-            events.items.firstOrNull()?.id
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    suspend fun createEvent(mealSession: MealSession, dishNames: List<String>): String? = withContext(Dispatchers.IO) {
-        val service = getCalendarService() ?: return@withContext null
-
-        val event = Event().apply {
-            summary = mealSession.mealType.lowercase().replaceFirstChar { it.uppercase() } + ": " + dishNames.joinToString(", ")
-            description = (mealSession.notes?.let { "\nNotes: $it" } ?: "")
+    private fun prepareEvent(mealSession: MealSession, dishNames: List<String>): Event {
+        return Event().apply {
+            summary = "${mealSession.mealType.lowercase().replaceFirstChar { it.uppercase() }}: ${dishNames.joinToString(", ")}"
+            description = mealSession.notes?.let { "Notes: $it" } ?: ""
             
             val start = DateTime(mealSession.scheduledTimestamp)
-            val end = DateTime(mealSession.scheduledTimestamp + 1800000)
+            val end = DateTime(mealSession.scheduledTimestamp + 1800000) // 30 min duration
             
             setStart(EventDateTime().setDateTime(start))
             setEnd(EventDateTime().setDateTime(end))
 
-            // Add metadata to prevent duplicates
             extendedProperties = Event.ExtendedProperties().apply {
                 private = mapOf("planMyPlateSessionId" to mealSession.sessionId.toString())
             }
         }
+    }
 
+    private suspend fun <T> runCalendarTask(action: suspend (Calendar) -> T): T? = withContext(Dispatchers.IO) {
+        val service = getCalendarService() ?: return@withContext null
         try {
-            val createdEvent = service.events().insert("primary", event).execute()
-            createdEvent.id
+            action(service)
         } catch (e: UserRecoverableAuthIOException) {
-            Log.e("CalendarRepository", "Auth consent required", e)
             throw e
         } catch (e: Exception) {
-            Log.e("CalendarRepository", "Error creating event", e)
+            Log.e("CalendarRepository", "Operation failed", e)
             null
         }
     }
 
-    suspend fun updateEvent(calendarEventId: String, mealSession: MealSession, dishNames: List<String>) = withContext(Dispatchers.IO) {
-        val service = getCalendarService() ?: return@withContext
-        
-        try {
-            val event = service.events().get("primary", calendarEventId).execute()
-            event.apply {
-                summary = mealSession.mealType.lowercase().replaceFirstChar { it.uppercase() } + ": " + dishNames.joinToString(", ")
-                description = (mealSession.notes?.let { "\nNotes: $it" } ?: "")
-                
-                val start = DateTime(mealSession.scheduledTimestamp)
-                val end = DateTime(mealSession.scheduledTimestamp + 1800000)
-                
-                setStart(EventDateTime().setDateTime(start))
-                setEnd(EventDateTime().setDateTime(end))
-            }
+    suspend fun findExistingEventId(sessionId: Long): String? = runCalendarTask { service ->
+        val events = service.events().list("primary")
+            .setPrivateExtendedProperty(listOf("planMyPlateSessionId=$sessionId"))
+            .execute()
+        events.items?.firstOrNull()?.id
+    }
 
+    suspend fun createEvent(mealSession: MealSession, dishNames: List<String>): String? = runCalendarTask { service ->
+        val event = prepareEvent(mealSession, dishNames)
+        service.events().insert("primary", event).execute().id
+    }
+
+    suspend fun updateEvent(calendarEventId: String, mealSession: MealSession, dishNames: List<String>) {
+        runCalendarTask { service ->
+            val event = service.events().get("primary", calendarEventId).execute()
+            val updatedData = prepareEvent(mealSession, dishNames)
+            
+            event.summary = updatedData.summary
+            event.description = updatedData.description
+            event.start = updatedData.start
+            event.end = updatedData.end
+            
             service.events().update("primary", calendarEventId, event).execute()
-        } catch (e: UserRecoverableAuthIOException) {
-            throw e
-        } catch (e: Exception) {
-            Log.e("CalendarRepository", "Error updating event", e)
         }
     }
 
-    suspend fun deleteEvent(calendarEventId: String) = withContext(Dispatchers.IO) {
-        val service = getCalendarService() ?: return@withContext
-        try {
+    suspend fun deleteEvent(calendarEventId: String) {
+        runCalendarTask { service ->
             service.events().delete("primary", calendarEventId).execute()
-        } catch (e: UserRecoverableAuthIOException) {
-            throw e
-        } catch (e: Exception) {
-            Log.e("CalendarRepository", "Error deleting event", e)
         }
     }
 }
