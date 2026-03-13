@@ -55,7 +55,7 @@ class CalendarRepository(private val context: Context) {
             description = (mealSession.notes?.let { "\nNotes: $it" } ?: "")
             
             val start = DateTime(mealSession.scheduledTimestamp)
-            val end = DateTime(mealSession.scheduledTimestamp + 3600000) // 1 hour duration
+            val end = DateTime(mealSession.scheduledTimestamp + 1800000) // 1 hour duration
             
             setStart(EventDateTime().setDateTime(start))
             setEnd(EventDateTime().setDateTime(end))
@@ -88,7 +88,7 @@ class CalendarRepository(private val context: Context) {
                 description = (mealSession.notes?.let { "\nNotes: $it" } ?: "")
                 
                 val start = DateTime(mealSession.scheduledTimestamp)
-                val end = DateTime(mealSession.scheduledTimestamp + 3600000)
+                val end = DateTime(mealSession.scheduledTimestamp + 1800000)
                 
                 setStart(EventDateTime().setDateTime(start))
                 setEnd(EventDateTime().setDateTime(end))
