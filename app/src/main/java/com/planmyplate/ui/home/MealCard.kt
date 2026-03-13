@@ -3,18 +3,36 @@ package com.planmyplate.ui.home
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Restaurant
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.planmyplate.model.Meal
@@ -31,6 +49,7 @@ fun MealCard(
 ) {
     val dotCenterY = 26.dp
     val itemGap = 16.dp
+    val mealColor = MealTypeIcons.getColor(meal.type)
 
     Row(
         modifier = Modifier
@@ -39,7 +58,6 @@ fun MealCard(
             .height(IntrinsicSize.Min),
         verticalAlignment = Alignment.Top
     ) {
-        // Timeline Column
         Box(
             modifier = Modifier
                 .width(32.dp)
@@ -47,7 +65,7 @@ fun MealCard(
             contentAlignment = Alignment.TopCenter
         ) {
             val lineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-            
+
             if (!isFirst) {
                 Box(
                     modifier = Modifier
@@ -56,14 +74,16 @@ fun MealCard(
                         .background(lineColor)
                 )
             }
-            
-            Box(
-                modifier = Modifier
-                    .padding(top = dotCenterY)
-                    .width(2.dp)
-                    .fillMaxHeight()
-                    .background(lineColor)
-            )
+
+            if (!isLast) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = dotCenterY)
+                        .width(2.dp)
+                        .fillMaxHeight()
+                        .background(lineColor)
+                )
+            }
 
             val dotSize = 16.dp
             Box(
@@ -76,13 +96,13 @@ fun MealCard(
                     modifier = Modifier
                         .size(dotSize)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                        .background(mealColor.copy(alpha = 0.3f))
                 )
                 Box(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
+                        .background(mealColor)
                 )
             }
         }
@@ -99,57 +119,102 @@ fun MealCard(
                         onLongClick = onLongClick
                     ),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isSelected) 
-                        MaterialTheme.colorScheme.primaryContainer 
-                    else 
+                    containerColor = if (isSelected) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
                         MaterialTheme.colorScheme.surface
+                    }
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                elevation = CardDefaults.cardElevation(
+                    defaultElevation = if (isSelected) 2.dp else 0.dp
+                ),
                 shape = RoundedCornerShape(16.dp),
                 border = androidx.compose.foundation.BorderStroke(
-                    1.dp, 
-                    if (isSelected) 
-                        MaterialTheme.colorScheme.primary 
-                    else 
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    1.dp,
+                    if (isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                    }
                 )
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier.background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                mealColor.copy(alpha = 0.15f),
+                                MaterialTheme.colorScheme.surface
+                            )
+                        )
+                    )
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = meal.name, 
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.sp), 
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = meal.type.name.lowercase().replaceFirstChar { it.uppercase() }, 
-                            style = MaterialTheme.typography.labelLarge, 
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = meal.formattedTime, 
-                            style = MaterialTheme.typography.bodySmall, 
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    
-                    if (isSelected) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "Selected",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    } else {
-                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), modifier = Modifier.size(40.dp)) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(imageVector = Icons.Default.Restaurant, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = meal.name,
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Surface(
+                                color = mealColor.copy(alpha = 0.22f),
+                                shape = RoundedCornerShape(999.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = MealTypeIcons.getIcon(meal.type),
+                                        contentDescription = null,
+                                        tint = mealColor,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = meal.type.name.lowercase().replaceFirstChar { it.uppercase() },
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = mealColor,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Schedule,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = meal.formattedTime,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Selected",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
                         }
                     }
                 }

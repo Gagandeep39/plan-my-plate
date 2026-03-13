@@ -8,15 +8,10 @@ import com.planmyplate.model.DayPlan
 import com.planmyplate.model.Meal
 import com.planmyplate.model.MealType
 import com.planmyplate.model.MealWithDishes
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -25,7 +20,10 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
     private val _selectedMealIds = MutableStateFlow<Set<String>>(emptySet())
     val selectedMealIds: StateFlow<Set<String>> = _selectedMealIds.asStateFlow()
 
-    private val _allMealsWithDishes = MutableStateFlow<List<MealWithDishes>>(emptyList())
+    private val _allMealsWithDishes = MutableStateFlow<List<MealWithDishes>?>(null)
+
+    private val dateFormat = SimpleDateFormat("EEEE, MMMM dd", Locale.getDefault())
+    private val isoFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
     init {
         viewModelScope.launch {
@@ -36,12 +34,15 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
     }
 
     val timelineState: StateFlow<List<DayPlan>> = _allMealsWithDishes
+        .filterNotNull()
         .map { mealsWithDishes ->
-            generateTimeline(mealsWithDishes)
+            withContext(Dispatchers.Default) {
+                generateTimeline(mealsWithDishes)
+            }
         }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
+            started = SharingStarted.Eagerly,
             initialValue = emptyList()
         )
 
@@ -58,7 +59,7 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
     fun deleteSelectedMeals() {
         viewModelScope.launch {
             val idsToDelete = _selectedMealIds.value
-            val mealsToDelete = _allMealsWithDishes.value.filter { it.session.sessionId.toString() in idsToDelete }
+            val mealsToDelete = (_allMealsWithDishes.value ?: emptyList()).filter { it.session.sessionId.toString() in idsToDelete }
             
             mealsToDelete.forEach { 
                 repository.deleteMeal(it.session)
@@ -68,9 +69,6 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
     }
 
     private fun generateTimeline(mealsWithDishes: List<MealWithDishes>): List<DayPlan> {
-        val dateFormat = SimpleDateFormat("EEEE, MMMM dd", Locale.getDefault())
-        val isoFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        
         val todayCalendar = Calendar.getInstance()
         val todayDateStr = dateFormat.format(todayCalendar.time)
         
@@ -87,8 +85,9 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
         genCalendar.add(Calendar.DAY_OF_YEAR, -10) 
 
         for (i in 0..20) { 
-            val currentIsoDate = isoFormat.format(genCalendar.time)
-            val currentDateStr = dateFormat.format(genCalendar.time)
+            val time = genCalendar.time
+            val currentIsoDate = isoFormat.format(time)
+            val currentDateStr = dateFormat.format(time)
             
             val mealsForDate = dataByDate[currentIsoDate] ?: emptyList()
             

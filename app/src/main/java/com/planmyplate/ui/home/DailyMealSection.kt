@@ -17,18 +17,21 @@ fun LazyListScope.DailyMealSection(
     onMealClick: (Long) -> Unit,
     onMealLongClick: (String) -> Unit
 ) {
-    stickyHeader {
+    // Adding a key to the sticky header for better stability
+    stickyHeader(key = "header_${dayPlan.headerTitle}") {
         HeaderItem(
             title = dayPlan.headerTitle,
             subtitle = dayPlan.subtitle
         )
     }
 
-    item {
-        Spacer(modifier = Modifier.height(16.dp))
-    }
+    // Removed top spacer to eliminate space above first meal card
 
-    itemsIndexed(dayPlan.meals) { index, meal ->
+    // Adding stable keys to meal items is crucial for smooth scrolling and animations
+    itemsIndexed(
+        items = dayPlan.meals,
+        key = { _, meal -> meal.id }
+    ) { index, meal ->
         MealCard(
             meal = meal,
             isFirst = index == 0,
@@ -45,7 +48,8 @@ fun LazyListScope.DailyMealSection(
         )
     }
 
-    item {
+    // Use a unique key for the "Add Meal" card as well
+    item(key = "add_${dayPlan.headerTitle}") {
         AddMealCard(
             isFirst = dayPlan.meals.isEmpty(),
             onAddClick = onAddMealClick

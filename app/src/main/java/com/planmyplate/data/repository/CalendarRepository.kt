@@ -12,6 +12,7 @@ import com.google.api.services.calendar.CalendarScopes
 import com.google.api.services.calendar.model.Event
 import com.google.api.services.calendar.model.EventDateTime
 import com.planmyplate.model.MealSession
+import com.planmyplate.util.AuthAccountResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Collections
@@ -19,13 +20,12 @@ import java.util.Collections
 class CalendarRepository(private val context: Context) {
 
     private fun getCalendarService(): Calendar? {
-        val sharedPrefs = context.getSharedPreferences("plan_my_plate_prefs", Context.MODE_PRIVATE)
-        val userEmail = sharedPrefs.getString("user_email", null) ?: return null
+        val account = AuthAccountResolver.resolveGoogleAccount(context) ?: return null
 
         val credential = GoogleAccountCredential.usingOAuth2(
             context, Collections.singleton(CalendarScopes.CALENDAR)
         ).apply {
-            selectedAccountName = userEmail
+            selectedAccount = account
         }
 
         return Calendar.Builder(

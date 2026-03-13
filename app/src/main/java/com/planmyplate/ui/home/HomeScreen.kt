@@ -10,11 +10,18 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.planmyplate.PlanMyPlateApp
+import com.planmyplate.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,47 +49,72 @@ fun HomeScreen(
         }
     }
 
+    // Use alpha to hide the list until it's scrolled to the correct position
+    var isReadyToShow by remember { mutableStateOf(false) }
+    
     LaunchedEffect(dayPlans) {
-        if (dayPlans.isNotEmpty()) {
+        if (dayPlans.isNotEmpty() && !isReadyToShow) {
             val todayIndex = dayPlans.indexOfFirst { it.isToday }
             if (todayIndex != -1) {
                 var scrollTarget = 0
                 for (i in 0 until todayIndex) {
-                    scrollTarget += 1 + 1 + dayPlans[i].meals.size + 1
+                    // Each DailyMealSection adds: 1 (stickyHeader) + meals.size + 1 (AddMealCard)
+                    scrollTarget += 1 + dayPlans[i].meals.size + 1
                 }
                 listState.scrollToItem(scrollTarget)
             }
+            isReadyToShow = true
         }
     }
 
     Scaffold(
+        modifier = Modifier.alpha(if (isReadyToShow) 1f else 0f),
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        if (isSelectionMode) "${selectedMealIds.size} Selected" else "Plan My Plate",
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
+            Surface(
+                modifier = Modifier.shadow(4.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 3.dp
+            ) {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            if (isSelectionMode) "${selectedMealIds.size} Selected" else "Plan My Plate",
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                    },
+                    navigationIcon = {
+                        if (isSelectionMode) {
+                            IconButton(onClick = { viewModel.clearSelection() }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear Selection")
+                            }
+                        } else {
+                            // Logo in the navigation icon slot to keep it in the left corner
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .padding(start = 8.dp)
+                                    .size(48.dp),
+                                tint = Color.Unspecified
+                            )
+                        }
+                    },
+                    actions = {
+                        if (isSelectionMode) {
+                            IconButton(onClick = { showDeleteDialog = true }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete Selected", tint = MaterialTheme.colorScheme.error)
+                            }
+                        } else {
+                            IconButton(onClick = onOpenSettings) {
+                                Icon(Icons.Default.Settings, contentDescription = "Settings")
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent
                     )
-                },
-                navigationIcon = {
-                    if (isSelectionMode) {
-                        IconButton(onClick = { viewModel.clearSelection() }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear Selection")
-                        }
-                    }
-                },
-                actions = {
-                    if (isSelectionMode) {
-                        IconButton(onClick = { showDeleteDialog = true }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete Selected", tint = MaterialTheme.colorScheme.error)
-                        }
-                    } else {
-                        IconButton(onClick = onOpenSettings) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings")
-                        }
-                    }
-                }
-            )
+                )
+            }
         }
     ) { innerPadding ->
         LazyColumn(

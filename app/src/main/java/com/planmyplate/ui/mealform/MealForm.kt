@@ -1,5 +1,7 @@
 package com.planmyplate.ui.mealform
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,6 +16,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,13 +25,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.planmyplate.PlanMyPlateApp
 import com.planmyplate.model.MealType
+import com.planmyplate.util.DatePickerMapper
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -47,7 +52,7 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
     
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = uiState.date.timeInMillis
+        initialSelectedDateMillis = DatePickerMapper.localCalendarToPickerUtcMidnightMillis(uiState.date)
     )
 
     var showTimePicker by remember { mutableStateOf(false) }
@@ -59,14 +64,29 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showMealTypeMenu by remember { mutableStateOf(false) }
 
+    // State to track if an item was recently added manually
+    var itemAddedTrigger by remember { mutableIntStateOf(0) }
+
+    // Consistent lighter border color
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+        disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+        disabledLabelColor = MaterialTheme.colorScheme.primary,
+        disabledLeadingIconColor = MaterialTheme.colorScheme.primary,
+    )
+
     LaunchedEffect(uiState.isSaved, uiState.isDeleted) {
         if (uiState.isSaved || uiState.isDeleted) {
             onBack()
         }
     }
 
-    LaunchedEffect(uiState.dishes.size) {
-        if (uiState.dishes.isNotEmpty()) {
+    // Auto-scroll ONLY when itemAddedTrigger changes (manually adding a dish)
+    LaunchedEffect(itemAddedTrigger) {
+        if (itemAddedTrigger > 0) {
+            // Delay slightly to allow the new item to be rendered before scrolling
+            delay(100)
             scrollState.animateScrollTo(scrollState.maxValue)
         }
     }
@@ -113,189 +133,222 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                 .padding(horizontal = 20.dp)
                 .fillMaxSize()
                 .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // Date Selection
-            OutlinedCard(
-                onClick = { showDatePicker = true },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+            Text(
+                text = "Meal Details",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault()).format(uiState.date.time),
+                    onValueChange = {},
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Date") },
+                    leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    shape = RoundedCornerShape(12.dp),
+                    readOnly = true,
+                    enabled = false,
+                    colors = fieldColors
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { showDatePicker = true }
+                )
+            }
+
+            ExposedDropdownMenuBox(
+                expanded = showMealTypeMenu,
+                onExpandedChange = { showMealTypeMenu = it },
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                OutlinedTextField(
+                    value = uiState.mealType.name.lowercase().replaceFirstChar { it.uppercase() },
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Meal Type") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    leadingIcon = { Icon(Icons.Default.RestaurantMenu, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showMealTypeMenu) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = fieldColors
+                )
+
+                ExposedDropdownMenu(
+                    expanded = showMealTypeMenu,
+                    onDismissRequest = { showMealTypeMenu = false }
                 ) {
-                    Icon(
-                        Icons.Default.CalendarMonth, 
-                        contentDescription = null, 
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text("Date", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        Text(
-                            SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault()).format(uiState.date.time),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium
+                    MealType.entries.forEach { type ->
+                        DropdownMenuItem(
+                            text = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                            onClick = {
+                                viewModel.onMealTypeSelected(type)
+                                showMealTypeMenu = false
+                            }
                         )
                     }
                 }
             }
 
-            // Meal Type Dropdown
-            Column {
-                Text("Meal Type", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                ExposedDropdownMenuBox(
-                    expanded = showMealTypeMenu,
-                    onExpandedChange = { showMealTypeMenu = it },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    OutlinedTextField(
-                        value = uiState.mealType.name.lowercase().replaceFirstChar { it.uppercase() },
-                        onValueChange = {},
-                        readOnly = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showMealTypeMenu) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+            Box(modifier = Modifier.fillMaxWidth()) {
+                val amPm = if (uiState.hour < 12) "AM" else "PM"
+                val displayHour = if (uiState.hour % 12 == 0) 12 else uiState.hour % 12
+                val timeStr = "%02d:%02d %s".format(displayHour, uiState.minute, amPm)
+
+                OutlinedTextField(
+                    value = timeStr,
+                    onValueChange = {},
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Time") },
+                    leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    shape = RoundedCornerShape(12.dp),
+                    readOnly = true,
+                    enabled = false,
+                    colors = fieldColors
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { showTimePicker = true }
+                )
+            }
+
+            HorizontalDivider()
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Dishes",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (uiState.dishes.isNotEmpty()) {
+                    Text(
+                        text = "${uiState.dishes.size} added",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    
-                    ExposedDropdownMenu(
-                        expanded = showMealTypeMenu,
-                        onDismissRequest = { showMealTypeMenu = false }
-                    ) {
-                        MealType.entries.forEach { type ->
-                            DropdownMenuItem(
-                                text = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) },
-                                onClick = {
-                                    viewModel.onMealTypeSelected(type)
-                                    showMealTypeMenu = false
-                                }
+                }
+            }
+
+            OutlinedTextField(
+                value = uiState.currentDishName,
+                onValueChange = { viewModel.onDishNameChanged(it) },
+                label = { Text("Add Dish") },
+                modifier = Modifier.fillMaxWidth(),
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Restaurant,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
+                trailingIcon = {
+                    if (uiState.currentDishName.isNotBlank()) {
+                        IconButton(onClick = {
+                            viewModel.addDish()
+                            itemAddedTrigger++
+                        }) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = "Add Dish",
+                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
-                }
-            }
-
-            // Time Selection
-            OutlinedCard(
-                onClick = { showTimePicker = true },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.Schedule, 
-                        contentDescription = null, 
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text("Time", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        val amPm = if (uiState.hour < 12) "AM" else "PM"
-                        val displayHour = if (uiState.hour % 12 == 0) 12 else uiState.hour % 12
-                        Text(
-                            "%02d:%02d %s".format(displayHour, uiState.minute, amPm),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
-
-            // Dishes Management
-            Column {
-                Text("Dishes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                OutlinedTextField(
-                    value = uiState.currentDishName,
-                    onValueChange = { viewModel.onDishNameChanged(it) },
-                    label = { Text("Add Dish") },
-                    modifier = Modifier.fillMaxWidth(),
-                    leadingIcon = { 
-                        Icon(
-                            Icons.Default.Restaurant, 
-                            contentDescription = null, 
-                            tint = MaterialTheme.colorScheme.primary
-                        ) 
-                    },
-                    trailingIcon = {
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = fieldColors,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
                         if (uiState.currentDishName.isNotBlank()) {
-                            IconButton(onClick = { viewModel.addDish() }) {
-                                Icon(
-                                    Icons.Default.Add, 
-                                    contentDescription = "Add Dish",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
+                            viewModel.addDish()
+                            itemAddedTrigger++
                         }
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Sentences,
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = { 
-                            if (uiState.currentDishName.isNotBlank()) {
-                                viewModel.addDish()
-                            }
-                        }
-                    )
+                    }
                 )
+            )
 
-                if (uiState.dishes.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
+            if (uiState.dishes.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     uiState.dishes.forEach { dish ->
-                        ListItem(
-                            headlineContent = { Text(dish, fontWeight = FontWeight.Medium) },
-                            trailingContent = {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = androidx.compose.foundation.BorderStroke(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = dish,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
                                 IconButton(onClick = { viewModel.removeDish(dish) }) {
                                     Icon(
-                                        Icons.Default.Close, 
+                                        Icons.Default.Close,
                                         contentDescription = "Remove",
-                                        tint = MaterialTheme.colorScheme.primary
+                                        tint = MaterialTheme.colorScheme.outline
                                     )
                                 }
-                            },
-                            colors = ListItemDefaults.colors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
-                                headlineColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            modifier = Modifier
-                                .padding(vertical = 2.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        )
+                            }
+                        }
                     }
                 }
             }
 
-            // Notes
+            HorizontalDivider()
+
+            Text(
+                text = "Notes",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+
             OutlinedTextField(
                 value = uiState.notes,
                 onValueChange = { viewModel.onNotesChanged(it) },
-                label = { Text("Notes (Optional)") },
                 modifier = Modifier.fillMaxWidth(),
+                label = { Text("Notes (Optional)") },
                 minLines = 3,
                 placeholder = { Text("e.g. Low carb, extra protein...") },
                 shape = RoundedCornerShape(12.dp),
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Sentences
-                )
+                colors = fieldColors
             )
             
-            Spacer(modifier = Modifier.height(120.dp))
+            Spacer(modifier = Modifier.height(96.dp))
         }
     }
 
@@ -330,9 +383,8 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let {
-                        val cal = Calendar.getInstance().apply { timeInMillis = it }
-                        viewModel.onDateSelected(cal)
+                    datePickerState.selectedDateMillis?.let { utcMillis ->
+                        viewModel.onDateSelected(DatePickerMapper.pickerUtcMillisToLocalCalendar(utcMillis))
                     }
                     showDatePicker = false
                 }) { Text("OK") }

@@ -1,0 +1,169 @@
+package com.planmyplate.ui.sync
+
+import android.content.Context
+import android.util.Log
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.planmyplate.PlanMyPlateApp
+import com.planmyplate.data.AppDatabase
+import com.planmyplate.data.repository.DriveRepository
+import com.planmyplate.data.repository.UserRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+sealed class SyncCheckState {
+    object Checking : SyncCheckState()
+    object Clear : SyncCheckState()
+    data class Conflict(
+        val localTimestamp: Long,
+        val cloudTimestamp: Long
+    ) : SyncCheckState()
+    object Restoring : SyncCheckState()
+    object RestoreComplete : SyncCheckState()
+    object Skipped : SyncCheckState()
+}
+
+class SyncCheckViewModel(
+    private val context: Context,
+    private val driveRepository: DriveRepository,
+    private val userRepository: UserRepository,
+    val isManualSync: Boolean = false
+) : ViewModel() {
+
+    private val _state = MutableStateFlow<SyncCheckState>(SyncCheckState.Checking)
+    val state: StateFlow<SyncCheckState> = _state.asStateFlow()
+    private var latestCloudTimestamp: Long = 0L
+
+    init {
+        viewModelScope.launch { runCheck() }
+    }
+
+    private suspend fun runCheck() {
+        val prefs = context.getSharedPreferences(UserRepository.PREFS_NAME, Context.MODE_PRIVATE)
+        val driveAuthorized = prefs.getBoolean(UserRepository.KEY_DRIVE_AUTHORIZED, false)
+        val syncEnabled = prefs.getBoolean(UserRepository.KEY_DB_SYNC_ENABLED, false)
+
+        if (!driveAuthorized || !syncEnabled) {
+            _state.value = SyncCheckState.Skipped
+            return
+        }
+
+        val cloudInfo = driveRepository.getCloudBackupInfo()
+        val lastWrite = prefs.getLong(UserRepository.KEY_DB_LAST_WRITE_TIMESTAMP, 0L)
+        val lastUpload = prefs.getLong(UserRepository.KEY_DB_LAST_UPLOAD_TIMESTAMP, 0L)
+        val hasLocalChanges = lastWrite > lastUpload
+
+        // 1. No cloud backup exists yet
+        if (cloudInfo == null) {
+            if (isManualSync || hasLocalChanges) userRepository.enqueueDbSyncForced()
+            _state.value = SyncCheckState.Clear
+            return
+        }
+
+        latestCloudTimestamp = cloudInfo.modifiedTimeMs
+
+        // 2. Empty local DB - always restore if cloud data is available
+        val localMealCount = withContext(Dispatchers.IO) {
+            AppDatabase.getDatabase(context).mealDao().getMealCount()
+        }
+        if (localMealCount == 0) {
+            _state.value = SyncCheckState.Restoring
+            restoreFromCloud()
+            return
+        }
+
+        // 3. Conflict detection: Cloud is newer than our last successful interaction
+        if (cloudInfo.modifiedTimeMs > lastUpload) {
+            _state.value = SyncCheckState.Conflict(
+                localTimestamp = lastWrite,
+                cloudTimestamp = cloudInfo.modifiedTimeMs
+            )
+        } else {
+            // 4. Local is up-to-date or ahead. Backup if manual OR if changes exist.
+            if (isManualSync || hasLocalChanges) {
+                userRepository.enqueueDbSyncForced()
+            }
+            _state.value = SyncCheckState.Clear
+        }
+    }
+
+    fun keepLocal() {
+        val now = System.currentTimeMillis()
+        userRepository.recordUploadTimestamp(latestCloudTimestamp.coerceAtLeast(now))
+        userRepository.enqueueDbSyncForced()
+        _state.value = SyncCheckState.Clear
+    }
+
+    fun useCloud() {
+        _state.value = SyncCheckState.Restoring
+        viewModelScope.launch { restoreFromCloud() }
+    }
+
+    private suspend fun restoreFromCloud() {
+        try {
+            val targetFile = withContext(Dispatchers.IO) {
+                File(context.cacheDir, "plan_my_plate_restore.db")
+            }
+            val success = driveRepository.downloadDatabaseBackup(targetFile)
+            if (!success || !targetFile.exists()) {
+                _state.value = SyncCheckState.Clear
+                return
+            }
+
+            withContext(Dispatchers.IO) {
+                (context.applicationContext as? PlanMyPlateApp)?.resetDatabaseReferences()
+                    ?: AppDatabase.closeAndReset()
+
+                val dbFile = context.getDatabasePath("plan_my_plate_db")
+                val walFile = File(dbFile.path + "-wal")
+                val shmFile = File(dbFile.path + "-shm")
+
+                dbFile.parentFile?.mkdirs()
+                targetFile.copyTo(dbFile, overwrite = true)
+                if (walFile.exists()) walFile.delete()
+                if (shmFile.exists()) shmFile.delete()
+
+                val prefs = context.getSharedPreferences(UserRepository.PREFS_NAME, Context.MODE_PRIVATE)
+                val cloudInfo = driveRepository.getCloudBackupInfo()
+                val cloudTs = cloudInfo?.modifiedTimeMs ?: System.currentTimeMillis()
+                
+                // After restore, we are in sync with the cloud.
+                prefs.edit()
+                    .putLong(UserRepository.KEY_DB_LAST_UPLOAD_TIMESTAMP, cloudTs)
+                    .putLong(UserRepository.KEY_DB_LAST_WRITE_TIMESTAMP, cloudTs)
+                    .apply()
+
+                targetFile.delete()
+            }
+
+            _state.value = SyncCheckState.RestoreComplete
+        } catch (e: Exception) {
+            Log.e("SyncCheck", "Restore failed", e)
+            _state.value = SyncCheckState.Clear
+        }
+    }
+
+    fun formatTimestamp(ms: Long): String =
+        SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date(ms))
+}
+
+class SyncCheckViewModelFactory(
+    private val context: Context,
+    private val driveRepository: DriveRepository,
+    private val userRepository: UserRepository,
+    private val isManualSync: Boolean = false
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        @Suppress("UNCHECKED_CAST")
+        return SyncCheckViewModel(context, driveRepository, userRepository, isManualSync) as T
+    }
+}
