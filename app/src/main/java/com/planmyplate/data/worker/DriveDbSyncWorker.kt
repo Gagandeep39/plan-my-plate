@@ -1,6 +1,7 @@
 package com.planmyplate.data.worker
 
 import android.content.Context
+import android.os.Build
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
@@ -26,10 +27,9 @@ class DriveDbSyncWorker(
         private const val UNIQUE_WORK_NAME = "drive_db_backup"
         private const val KEY_FORCE = "force"
 
-        /** Minimum time between consecutive uploads. Rapid data changes are debounced naturally. */
+        /** Minimum time between consecutive uploads. */
         const val COOLDOWN_MS = 15 * 60 * 1000L // 15 minutes
 
-        /** Normal enqueue — honours cooldown and uses KEEP policy. */
         fun enqueue(context: Context) {
             val request = OneTimeWorkRequestBuilder<DriveDbSyncWorker>()
                 .setConstraints(
@@ -40,7 +40,6 @@ class DriveDbSyncWorker(
                 .addTag(DRIVE_DB_SYNC_WORK_TAG)
                 .build()
 
-            // KEEP: if a job is already queued or running, don't replace it.
             WorkManager.getInstance(context).enqueueUniqueWork(
                 UNIQUE_WORK_NAME,
                 ExistingWorkPolicy.KEEP,
@@ -48,7 +47,6 @@ class DriveDbSyncWorker(
             )
         }
 
-        /** Force enqueue — bypasses cooldown, replaces any queued job. */
         fun enqueueForced(context: Context) {
             val request = OneTimeWorkRequestBuilder<DriveDbSyncWorker>()
                 .setConstraints(
@@ -73,46 +71,64 @@ class DriveDbSyncWorker(
         val database = AppDatabase.getDatabase(applicationContext)
         val syncLogRepo = SyncLogRepository(database.syncLogDao())
 
-        // Guard: only run when Drive is authorised and the user has the toggle on
         if (!prefs.getBoolean(UserRepository.KEY_DRIVE_AUTHORIZED, false) ||
             !prefs.getBoolean(UserRepository.KEY_DB_SYNC_ENABLED, false)
         ) {
-            syncLogRepo.log(
-                service = SyncLog.SERVICE_DRIVE,
-                action = "Backup database",
-                status = SyncLog.STATUS_SKIPPED,
-                source = SyncLog.SOURCE_QUEUE,
-                message = "Skipped: Drive backup is disabled or Drive is not connected"
-            )
             return Result.success()
         }
 
-        // Cooldown check — skip if too soon, unless this was a forced manual sync
         val forced = inputData.getBoolean(KEY_FORCE, false)
         if (!forced) {
             val lastSync = prefs.getLong(UserRepository.KEY_DB_LAST_SYNC_TIMESTAMP, 0L)
             val elapsed = System.currentTimeMillis() - lastSync
-            if (elapsed < COOLDOWN_MS) {
-                val remainingMin = (COOLDOWN_MS - elapsed) / 60_000
-                syncLogRepo.log(
-                    service = SyncLog.SERVICE_DRIVE,
-                    action = "Backup database",
-                    status = SyncLog.STATUS_SKIPPED,
-                    source = SyncLog.SOURCE_QUEUE,
-                    message = "Cooldown active — next backup available in ${remainingMin}m"
-                )
-                return Result.success()
-            }
+            if (elapsed < COOLDOWN_MS) return Result.success()
         }
 
         return try {
-            // Flush any pending WAL writes so the main DB file is complete
-            database.query(androidx.sqlite.db.SimpleSQLiteQuery("PRAGMA wal_checkpoint(TRUNCATE)")).close()
+            val dbFile = applicationContext.getDatabasePath("plan_my_plate_db")
+            val cacheFile = File(applicationContext.cacheDir, "plan_my_plate_backup.db")
+            
+            // Ensure any existing cache file is gone so we don't upload old data if this fails
+            if (cacheFile.exists()) cacheFile.delete()
 
-            // Never overwrite a good backup with an empty database
+            // 1. Try modern VACUUM INTO (API 29+) for a safe, single-file hot backup
+            var backupReady = false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    database.openHelper.writableDatabase.execSQL("VACUUM INTO '${cacheFile.absolutePath}'")
+                    backupReady = cacheFile.exists() && cacheFile.length() > 0
+                } catch (e: Exception) {
+                    // Fallback to checkpoint if VACUUM INTO fails
+                }
+            }
+
+            // 2. Fallback to Checkpoint + Copy
+            if (!backupReady) {
+                // Use TRUNCATE checkpoint to force everything into the main file and reset WAL
+                try {
+                    database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { cursor ->
+                        val busy = if (cursor.moveToFirst()) cursor.getInt(0) else 1
+                        if (busy == 1) {
+                            // If busy, we can't guarantee the main file is complete. Try FULL.
+                            database.openHelper.writableDatabase.execSQL("PRAGMA wal_checkpoint(FULL)")
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Ignore checkpoint errors and try copy anyway, but it might be incomplete
+                }
+                
+                if (dbFile.exists()) {
+                    dbFile.copyTo(cacheFile, overwrite = true)
+                    backupReady = cacheFile.exists() && cacheFile.length() > 0
+                }
+            }
+
+            if (!backupReady) throw Exception("Failed to create a valid database backup file")
+
+            // Never overwrite with an empty database (sanity check)
             val mealCount = database.mealDao().getMealCount()
             if (mealCount == 0) {
-                syncLogRepo.log(
+                 syncLogRepo.log(
                     service = SyncLog.SERVICE_DRIVE,
                     action = "Backup database",
                     status = SyncLog.STATUS_SKIPPED,
@@ -121,11 +137,6 @@ class DriveDbSyncWorker(
                 )
                 return Result.success()
             }
-
-            // Copy the DB file to cache before uploading
-            val dbFile = applicationContext.getDatabasePath("plan_my_plate_db")
-            val cacheFile = File(applicationContext.cacheDir, "plan_my_plate_backup.db")
-            dbFile.copyTo(cacheFile, overwrite = true)
 
             val success = DriveRepository(applicationContext).uploadDatabaseBackup()
 
@@ -145,7 +156,7 @@ class DriveDbSyncWorker(
                 action = "Backup database",
                 status = SyncLog.STATUS_FAILURE,
                 source = SyncLog.SOURCE_QUEUE,
-                message = e.message ?: "Unexpected error during database backup"
+                message = e.message ?: "Unexpected error during backup"
             )
             if (runAttemptCount < 2) Result.retry() else Result.failure()
         }
