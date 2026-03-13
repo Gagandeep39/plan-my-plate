@@ -25,6 +25,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Kick off a DB backup on every fresh start (worker handles cooldown + auth checks)
+        (applicationContext as PlanMyPlateApp).userRepository.enqueueDbSync()
+
         setContent {
             PlanMyPlateTheme {
                 Surface(
@@ -35,6 +39,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Back up DB whenever the app moves to background / is closed
+        (applicationContext as PlanMyPlateApp).userRepository.enqueueDbSync()
     }
 }
 

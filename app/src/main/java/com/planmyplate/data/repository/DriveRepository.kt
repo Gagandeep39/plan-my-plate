@@ -206,4 +206,64 @@ class DriveRepository(private val context: Context) {
             null
         }
     }
+
+    /**
+     * Uploads the pre-copied SQLite DB file (from cache) to Google Drive.
+     * The worker is responsible for WAL checkpoint + file copy before calling this.
+     */
+    suspend fun uploadDatabaseBackup(source: String = SyncLog.SOURCE_QUEUE): Boolean = withContext(Dispatchers.IO) {
+        val service = getDriveService() ?: return@withContext false
+
+        try {
+            val cacheFile = java.io.File(context.cacheDir, "plan_my_plate_backup.db")
+            if (!cacheFile.exists()) {
+                insertSyncLog(
+                    action = "Backup database",
+                    status = SyncLog.STATUS_FAILURE,
+                    source = source,
+                    message = "Backup file not found in cache"
+                )
+                return@withContext false
+            }
+
+            // Find an existing backup file on Drive (scoped to this app via DRIVE_FILE)
+            val query = "name = 'plan_my_plate_backup.db' and trashed = false"
+            val existingId = service.files().list()
+                .setQ(query)
+                .setFields("files(id)")
+                .execute()
+                .files
+                ?.firstOrNull()
+                ?.id
+
+            val content = FileContent("application/octet-stream", cacheFile)
+
+            if (existingId != null) {
+                service.files().update(existingId, null, content).setFields("id").execute()
+            } else {
+                val metadata = File().apply {
+                    name = "plan_my_plate_backup.db"
+                    mimeType = "application/octet-stream"
+                }
+                service.files().create(metadata, content).setFields("id").execute()
+            }
+
+            val sizeKb = cacheFile.length() / 1024
+            insertSyncLog(
+                action = "Backup database",
+                status = SyncLog.STATUS_SUCCESS,
+                source = source,
+                message = "Database backed up successfully (${sizeKb}KB)"
+            )
+            true
+        } catch (e: Exception) {
+            insertSyncLog(
+                action = "Backup database",
+                status = SyncLog.STATUS_FAILURE,
+                source = source,
+                message = e.message ?: "Unknown Drive error"
+            )
+            false
+        }
+    }
 }

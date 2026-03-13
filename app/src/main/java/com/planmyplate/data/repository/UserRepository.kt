@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.work.WorkManager
+import com.planmyplate.data.worker.DriveDbSyncWorker
 import com.planmyplate.data.worker.DriveExportWorker
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +17,8 @@ class UserRepository(private val context: Context) {
         const val KEY_CALENDAR_AUTHORIZED = "calendar_authorized"
         const val KEY_DRIVE_AUTHORIZED = "drive_authorized"
         const val KEY_DRIVE_SHARABLE_LINK = "drive_sharable_link"
+        const val KEY_DB_SYNC_ENABLED = "db_sync_enabled"
+        const val KEY_DB_LAST_SYNC_TIMESTAMP = "db_last_sync_timestamp"
     }
 
     private val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -31,6 +34,9 @@ class UserRepository(private val context: Context) {
 
     private val _sharableLink = MutableStateFlow(sharedPrefs.getString(KEY_DRIVE_SHARABLE_LINK, null))
     val sharableLink: StateFlow<String?> = _sharableLink.asStateFlow()
+
+    private val _isDbSyncEnabled = MutableStateFlow(sharedPrefs.getBoolean(KEY_DB_SYNC_ENABLED, false))
+    val isDbSyncEnabled: StateFlow<Boolean> = _isDbSyncEnabled.asStateFlow()
 
     fun saveUser(email: String) {
         sharedPrefs.edit().putString(KEY_USER_EMAIL, email).apply()
@@ -50,7 +56,28 @@ class UserRepository(private val context: Context) {
         _isDriveAuthorized.value = authorized
         if (!authorized) {
             WorkManager.getInstance(context).cancelAllWorkByTag(DriveExportWorker.DRIVE_EXPORT_WORK_TAG)
+            WorkManager.getInstance(context).cancelAllWorkByTag(DriveDbSyncWorker.DRIVE_DB_SYNC_WORK_TAG)
         }
+    }
+
+    fun setDbSyncEnabled(enabled: Boolean) {
+        sharedPrefs.edit().putBoolean(KEY_DB_SYNC_ENABLED, enabled).apply()
+        _isDbSyncEnabled.value = enabled
+        if (!enabled) {
+            WorkManager.getInstance(context).cancelAllWorkByTag(DriveDbSyncWorker.DRIVE_DB_SYNC_WORK_TAG)
+        }
+    }
+
+    /** Enqueues a DB backup only when both Drive is authorised and the toggle is on. */
+    fun enqueueDbSync() {
+        if (!_isDriveAuthorized.value || !_isDbSyncEnabled.value) return
+        DriveDbSyncWorker.enqueue(context)
+    }
+
+    /** Force-enqueues a DB backup, bypassing cooldown. Requires Drive authorised + toggle on. */
+    fun enqueueDbSyncForced() {
+        if (!_isDriveAuthorized.value || !_isDbSyncEnabled.value) return
+        DriveDbSyncWorker.enqueueForced(context)
     }
 
     fun enqueueDriveExportSync() {
@@ -74,6 +101,8 @@ class UserRepository(private val context: Context) {
         _isCalendarAuthorized.value = false
         _isDriveAuthorized.value = false
         _sharableLink.value = null
+        _isDbSyncEnabled.value = false
+        WorkManager.getInstance(context).cancelAllWorkByTag(DriveDbSyncWorker.DRIVE_DB_SYNC_WORK_TAG)
         // Credential manager clear is slow — run it after UI state is already updated
         val credentialManager = CredentialManager.create(context)
         credentialManager.clearCredentialState(ClearCredentialStateRequest())

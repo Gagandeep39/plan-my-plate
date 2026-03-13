@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 data class SettingsUiState(
     val isGoogleConnected: Boolean = false,
     val isDriveConnected: Boolean = false,
+    val isDbSyncEnabled: Boolean = false,
     val userEmail: String? = null,
     val sharableLink: String? = null,
     val syncLogs: List<SyncLog> = emptyList(),
@@ -90,6 +91,11 @@ class SettingsViewModel(
                         silentlyVerifyDriveLink()
                     }
                 }
+            }
+        }
+        viewModelScope.launch {
+            userRepository.isDbSyncEnabled.collect { enabled ->
+                _uiState.update { it.copy(isDbSyncEnabled = enabled) }
             }
         }
         viewModelScope.launch {
@@ -218,6 +224,15 @@ class SettingsViewModel(
 
     fun disconnectCalendar() {
         userRepository.setCalendarAuthorized(false)
+    }
+
+    fun setDbSyncEnabled(enabled: Boolean) {
+        userRepository.setDbSyncEnabled(enabled)
+        if (enabled) userRepository.enqueueDbSync()
+    }
+
+    fun syncDbNow() {
+        userRepository.enqueueDbSyncForced()
     }
 
     fun disconnectDrive() {

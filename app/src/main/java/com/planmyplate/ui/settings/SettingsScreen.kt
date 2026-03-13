@@ -187,7 +187,9 @@ fun SettingsScreen(
                                 }
                             },
                             onDisconnect = { viewModel.disconnectDrive() },
-                            onRefreshLink = { viewModel.refreshDriveLink() }
+                            onRefreshLink = { viewModel.refreshDriveLink() },
+                            onDbSyncToggle = { viewModel.setDbSyncEnabled(it) },
+                            onSyncNow = { viewModel.syncDbNow() }
                         )
                     }
                 }
@@ -314,7 +316,9 @@ fun DriveCard(
     uiState: SettingsUiState,
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
-    onRefreshLink: () -> Unit
+    onRefreshLink: () -> Unit,
+    onDbSyncToggle: (Boolean) -> Unit,
+    onSyncNow: () -> Unit
 ) {
     val context = LocalContext.current
     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
@@ -409,7 +413,7 @@ fun DriveCard(
 
                 HorizontalDivider()
 
-                // Option 2: Cloud Sync (coming soon)
+                // Option 2: Cloud Sync (DB backup)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -418,34 +422,39 @@ fun DriveCard(
                         Icons.Default.Backup,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (uiState.isDbSyncEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                     )
                     Column(modifier = Modifier.weight(1f)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                "Cloud Sync",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Surface(
-                                color = MaterialTheme.colorScheme.secondaryContainer,
-                                shape = MaterialTheme.shapes.extraSmall
-                            ) {
-                                Text(
-                                    "Coming soon",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                        Text("Automatically back up meals to Drive", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "Cloud Sync",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            "Back up database on app open and close",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                    Switch(checked = false, onCheckedChange = null, enabled = false)
+                    Switch(
+                        checked = uiState.isDbSyncEnabled,
+                        onCheckedChange = onDbSyncToggle
+                    )
+                }
+
+                if (uiState.isDbSyncEnabled) {
+                    OutlinedButton(
+                        onClick = onSyncNow,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            Icons.Default.Sync,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Sync Now")
+                    }
                 }
             }
         }
