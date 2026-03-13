@@ -107,8 +107,8 @@ class DriveDbSyncWorker(
                 }
             }
 
-            val dbFile = applicationContext.getDatabasePath("plan_my_plate_db")
-            val cacheFile = File(applicationContext.cacheDir, "plan_my_plate_backup.db")
+            val dbFile = applicationContext.getDatabasePath(AppDatabase.DB_NAME)
+            val cacheFile = File(applicationContext.cacheDir, AppDatabase.BACKUP_FILE_NAME)
             
             if (cacheFile.exists()) cacheFile.delete()
 

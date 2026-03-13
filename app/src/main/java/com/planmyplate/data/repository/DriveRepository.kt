@@ -26,6 +26,13 @@ import java.util.TimeZone
 
 class DriveRepository(private val context: Context) {
 
+    companion object {
+        private const val FOLDER_NAME = "com.planmyplate"
+        private const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
+        private const val JSON_BACKUP_NAME = "running_plan.json"
+        private val DB_BACKUP_NAME = AppDatabase.BACKUP_FILE_NAME
+    }
+
     private suspend fun insertSyncLog(
         action: String,
         status: String,
@@ -67,19 +74,41 @@ class DriveRepository(private val context: Context) {
         }
     }
 
-    private fun findExistingJsonFileId(service: Drive): String? {
-        val query = "name = 'running_plan.json' and trashed = false"
+    /**
+     * Gets the ID of the app's dedicated folder, creating it if it doesn't exist.
+     */
+    private fun getOrCreateFolderId(service: Drive): String? {
+        return try {
+            val query = "name = '$FOLDER_NAME' and mimeType = '$FOLDER_MIME_TYPE' and trashed = false"
+            val files = service.files().list().setQ(query).setFields("files(id)").execute()
+            val existingId = files.files?.firstOrNull()?.id
+            if (existingId != null) return existingId
+
+            val metadata = File().apply {
+                name = FOLDER_NAME
+                mimeType = FOLDER_MIME_TYPE
+            }
+            service.files().create(metadata).setFields("id").execute().id
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun findExistingJsonFileId(service: Drive, folderId: String): String? {
+        val query = "name = '$JSON_BACKUP_NAME' and '$folderId' in parents and trashed = false"
         val files = service.files().list().setQ(query).setFields("files(id)").execute()
         return files.files?.firstOrNull()?.id
     }
 
     private fun ensureJsonFileExists(service: Drive): String? {
-        val existingId = findExistingJsonFileId(service)
+        val folderId = getOrCreateFolderId(service) ?: return null
+        val existingId = findExistingJsonFileId(service, folderId)
         if (existingId != null) return existingId
 
         val metadata = File().apply {
-            name = "running_plan.json"
+            name = JSON_BACKUP_NAME
             mimeType = "application/json"
+            parents = listOf(folderId)
         }
         val emptyFile = java.io.File(context.cacheDir, "temp.json").apply { writeText("[]") }
         val content = FileContent("application/json", emptyFile)
@@ -239,7 +268,8 @@ class DriveRepository(private val context: Context) {
     suspend fun getCloudBackupInfo(): CloudBackupInfo? = withContext(Dispatchers.IO) {
         val service = getDriveService() ?: return@withContext null
         try {
-            val query = "name = 'plan_my_plate_backup.db' and trashed = false"
+            val folderId = getOrCreateFolderId(service) ?: return@withContext null
+            val query = "name = '$DB_BACKUP_NAME' and '$folderId' in parents and trashed = false"
             val file = service.files().list()
                 .setQ(query)
                 .setFields("files(id, modifiedTime, size)")
@@ -271,7 +301,8 @@ class DriveRepository(private val context: Context) {
             return@withContext false
         }
         try {
-            val query = "name = 'plan_my_plate_backup.db' and trashed = false"
+            val folderId = getOrCreateFolderId(service) ?: return@withContext false
+            val query = "name = '$DB_BACKUP_NAME' and '$folderId' in parents and trashed = false"
             val fileId = service.files().list()
                 .setQ(query)
                 .setFields("files(id)")
@@ -321,7 +352,8 @@ class DriveRepository(private val context: Context) {
         }
 
         try {
-            val cacheFile = java.io.File(context.cacheDir, "plan_my_plate_backup.db")
+            val folderId = getOrCreateFolderId(service) ?: return@withContext false
+            val cacheFile = java.io.File(context.cacheDir, DB_BACKUP_NAME)
             if (!cacheFile.exists()) {
                 insertSyncLog(
                     action = "Backup database",
@@ -332,7 +364,7 @@ class DriveRepository(private val context: Context) {
                 return@withContext false
             }
 
-            val query = "name = 'plan_my_plate_backup.db' and trashed = false"
+            val query = "name = '$DB_BACKUP_NAME' and '$folderId' in parents and trashed = false"
             val existingId = service.files().list()
                 .setQ(query)
                 .setFields("files(id)")
@@ -347,8 +379,9 @@ class DriveRepository(private val context: Context) {
                 service.files().update(existingId, null, content).setFields("id").execute()
             } else {
                 val metadata = File().apply {
-                    name = "plan_my_plate_backup.db"
+                    name = DB_BACKUP_NAME
                     mimeType = "application/octet-stream"
+                    parents = listOf(folderId)
                 }
                 service.files().create(metadata, content).setFields("id").execute()
             }

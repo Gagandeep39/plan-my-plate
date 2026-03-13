@@ -15,6 +15,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun syncLogDao(): SyncLogDao
 
     companion object {
+        const val DB_NAME = "plan_my_plate_db"
+        const val BACKUP_FILE_NAME = "data.db"
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -23,7 +26,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "plan_my_plate_db"
+                    DB_NAME
                 )
 
                 .fallbackToDestructiveMigration(true) // Simpler for development, handles schema change
