@@ -2,6 +2,7 @@ package com.planmyplate
 
 import android.app.Application
 import com.planmyplate.data.AppDatabase
+import com.planmyplate.data.repository.DriveRepository
 import com.planmyplate.data.repository.MealRepository
 import com.planmyplate.data.repository.UserRepository
 
@@ -14,5 +15,9 @@ class PlanMyPlateApp : Application() {
     
     val userRepository by lazy {
         UserRepository(this)
+    }
+
+    val driveRepository by lazy {
+        DriveRepository(this)
     }
 }

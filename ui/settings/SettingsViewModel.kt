@@ -131,7 +131,7 @@ class SettingsViewModel(
                     authorizationResult.pendingIntent?.let { onResolutionRequired(it) }
                 } else {
                     userRepository.setDriveAuthorized(true)
-                    // refreshDriveLink() is called by the init collector reacting to isDriveAuthorized
+                    refreshDriveLink()
                 }
             }
             .addOnFailureListener { e ->
@@ -146,7 +146,7 @@ class SettingsViewModel(
                 AuthStep.CALENDAR_ONLY -> userRepository.setCalendarAuthorized(true)
                 AuthStep.DRIVE_ONLY -> {
                     userRepository.setDriveAuthorized(true)
-                    // refreshDriveLink() is called by the init collector reacting to isDriveAuthorized
+                    refreshDriveLink()
                 }
                 else -> {}
             }
@@ -155,16 +155,11 @@ class SettingsViewModel(
         }
     }
 
-    fun refreshDriveLink() {
-        if (_uiState.value.isLoadingLink) return
+    private fun refreshDriveLink() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingLink = true, error = null) }
+            _uiState.update { it.copy(isLoadingLink = true) }
             val link = driveRepository.createOrGetSharableJsonFile()
-            if (link != null) {
-                _uiState.update { it.copy(sharableLink = link, isLoadingLink = false) }
-            } else {
-                _uiState.update { it.copy(isLoadingLink = false, error = "Could not load Drive link. Tap retry to try again.") }
-            }
+            _uiState.update { it.copy(sharableLink = link, isLoadingLink = false) }
         }
     }
 

@@ -1,6 +1,10 @@
 package com.planmyplate.ui.settings
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -8,9 +12,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
@@ -20,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.planmyplate.PlanMyPlateApp
@@ -31,7 +36,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     val app = context.applicationContext as PlanMyPlateApp
     
     val viewModel: SettingsViewModel = viewModel(
-        factory = SettingsViewModelFactory(app.userRepository)
+        factory = SettingsViewModelFactory(app.userRepository, app.driveRepository)
     )
     val uiState by viewModel.uiState.collectAsState()
 
@@ -135,17 +140,69 @@ fun SettingsScreen(onBack: () -> Unit) {
                 )
 
                 // Google Drive Service
-                ServiceCard(
-                    title = "Google Drive",
-                    description = "Backup meal data as JSON",
-                    isConnected = uiState.isDriveConnected,
-                    onConnect = {
-                        viewModel.connectDrive(context) { pendingIntent ->
-                            authLauncher.launch(IntentSenderRequest.Builder(pendingIntent).build())
+                Column {
+                    ServiceCard(
+                        title = "Google Drive",
+                        description = "Backup meal data as JSON",
+                        isConnected = uiState.isDriveConnected,
+                        onConnect = {
+                            viewModel.connectDrive(context) { pendingIntent ->
+                                authLauncher.launch(IntentSenderRequest.Builder(pendingIntent).build())
+                            }
+                        },
+                        onDisconnect = { viewModel.disconnectDrive() }
+                    )
+                    
+                    if (uiState.isDriveConnected) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        if (uiState.isLoadingLink) {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        } else if (uiState.sharableLink == null) {
+                            OutlinedButton(
+                                onClick = { viewModel.refreshDriveLink() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Sync, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Get share link")
+                            }
+                        } else if (uiState.sharableLink != null) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                shape = MaterialTheme.shapes.small,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = uiState.sharableLink!!,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    IconButton(
+                                        onClick = {
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            val clip = ClipData.newPlainText("Meal Plan Link", uiState.sharableLink)
+                                            clipboard.setPrimaryClip(clip)
+                                            Toast.makeText(context, "Link copied to clipboard", Toast.LENGTH_SHORT).show()
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.ContentCopy, 
+                                            contentDescription = "Copy Link",
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
-                    },
-                    onDisconnect = { viewModel.disconnectDrive() }
-                )
+                    }
+                }
             }
 
             uiState.error?.let { errorMsg ->
