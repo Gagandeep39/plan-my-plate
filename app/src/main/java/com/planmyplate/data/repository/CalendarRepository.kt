@@ -38,7 +38,17 @@ class CalendarRepository(private val context: Context) {
     private fun prepareEvent(mealSession: MealSession, dishNames: List<String>): Event {
         return Event().apply {
             summary = "${mealSession.mealType.lowercase().replaceFirstChar { it.uppercase() }}: ${dishNames.joinToString(", ")}"
-            description = mealSession.notes?.let { "Notes: $it" } ?: ""
+            colorId = "3" // Grape (Purple)
+            
+            description = buildString {
+                // Ensure the description starts immediately on the first line with notes (if any)
+                val notes = mealSession.notes
+                if (!notes.isNullOrBlank()) {
+                    append(notes)
+                    append("\n")
+                }
+                append("---\nCreated by Plan my Plate")
+            }
             
             val start = DateTime(mealSession.scheduledTimestamp)
             val end = DateTime(mealSession.scheduledTimestamp + 1800000) // 30 min duration
@@ -85,6 +95,7 @@ class CalendarRepository(private val context: Context) {
             event.description = updatedData.description
             event.start = updatedData.start
             event.end = updatedData.end
+            event.colorId = updatedData.colorId
             
             service.events().update("primary", calendarEventId, event).execute()
         }
