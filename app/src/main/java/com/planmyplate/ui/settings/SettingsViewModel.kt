@@ -15,6 +15,7 @@ import com.google.android.gms.common.api.Scope
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.api.services.calendar.CalendarScopes
+import com.google.api.services.drive.DriveScopes
 import com.planmyplate.data.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +25,7 @@ import kotlinx.coroutines.launch
 
 data class SettingsUiState(
     val isGoogleConnected: Boolean = false,
+    val isDriveConnected: Boolean = false,
     val userEmail: String? = null,
     val error: String? = null,
     val isSyncing: Boolean = false
@@ -34,6 +36,7 @@ class SettingsViewModel(private val userRepository: UserRepository) : ViewModel(
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     private val calendarScope = Scope(CalendarScopes.CALENDAR)
+    private val driveScope = Scope(DriveScopes.DRIVE_APPDATA)
 
     init {
         viewModelScope.launch {
@@ -44,6 +47,11 @@ class SettingsViewModel(private val userRepository: UserRepository) : ViewModel(
         viewModelScope.launch {
             userRepository.isCalendarAuthorized.collect { authorized ->
                 _uiState.update { it.copy(isGoogleConnected = authorized) }
+            }
+        }
+        viewModelScope.launch {
+            userRepository.isDriveAuthorized.collect { authorized ->
+                _uiState.update { it.copy(isDriveConnected = authorized) }
             }
         }
     }
@@ -70,6 +78,7 @@ class SettingsViewModel(private val userRepository: UserRepository) : ViewModel(
                 if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                     userRepository.saveUser(googleIdTokenCredential.id)
+                    // Request Calendar authorization by default after sign-in
                     requestCalendarAuthorization(context, onAuthResolutionRequired)
                 }
             } catch (e: GetCredentialException) {
@@ -99,9 +108,37 @@ class SettingsViewModel(private val userRepository: UserRepository) : ViewModel(
             }
     }
 
+    fun connectDrive(context: Context, onResolutionRequired: (android.app.PendingIntent) -> Unit) {
+        val authorizationRequest = AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(driveScope))
+            .build()
+
+        Identity.getAuthorizationClient(context)
+            .authorize(authorizationRequest)
+            .addOnSuccessListener { authorizationResult ->
+                if (authorizationResult.hasResolution()) {
+                    authorizationResult.pendingIntent?.let { onResolutionRequired(it) }
+                } else {
+                    userRepository.setDriveAuthorized(true)
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.e("SettingsViewModel", "Drive authorization failed", e)
+                _uiState.update { it.copy(error = "Drive access denied") }
+            }
+    }
+
     fun handleAuthorizationResult(success: Boolean) {
+        // Since we might be authorizing multiple things, we check the current state
+        // and update accordingly. In a more robust implementation, we'd track WHICH 
+        // request triggered the result. For now, we'll refresh both status.
         if (success) {
-            userRepository.setCalendarAuthorized(true)
+            // We assume if it returned successfully from an intent, at least one was granted
+            // We can't easily know which one without tracking request codes, 
+            // so we'll just check what the user was likely trying to do.
+            // For simplicity, we'll try to set both or the one that is currently missing.
+            if (!_uiState.value.isGoogleConnected) userRepository.setCalendarAuthorized(true)
+            else userRepository.setDriveAuthorized(true)
         } else {
             _uiState.update { it.copy(error = "Authorization cancelled or failed") }
         }

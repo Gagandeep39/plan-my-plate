@@ -16,6 +16,9 @@ class UserRepository(private val context: Context) {
     private val _isCalendarAuthorized = MutableStateFlow(sharedPrefs.getBoolean("calendar_authorized", false))
     val isCalendarAuthorized: StateFlow<Boolean> = _isCalendarAuthorized.asStateFlow()
 
+    private val _isDriveAuthorized = MutableStateFlow(sharedPrefs.getBoolean("drive_authorized", false))
+    val isDriveAuthorized: StateFlow<Boolean> = _isDriveAuthorized.asStateFlow()
+
     fun saveUser(email: String) {
         sharedPrefs.edit().putString("user_email", email).apply()
         _userEmail.value = email
@@ -26,13 +29,19 @@ class UserRepository(private val context: Context) {
         _isCalendarAuthorized.value = authorized
     }
 
+    fun setDriveAuthorized(authorized: Boolean) {
+        sharedPrefs.edit().putBoolean("drive_authorized", authorized).apply()
+        _isDriveAuthorized.value = authorized
+    }
+
     suspend fun logout() {
         val credentialManager = CredentialManager.create(context)
         credentialManager.clearCredentialState(ClearCredentialStateRequest())
         sharedPrefs.edit().clear().apply()
         _userEmail.value = null
         _isCalendarAuthorized.value = false
+        _isDriveAuthorized.value = false
     }
 
-    fun isLoggedIn(): Boolean = userEmail.value != null && isCalendarAuthorized.value
+    fun isLoggedIn(): Boolean = userEmail.value != null
 }
