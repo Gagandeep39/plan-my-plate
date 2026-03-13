@@ -1,5 +1,6 @@
 package com.planmyplate.ui.mealform
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -119,30 +120,29 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(8.dp))
 
             // Date Selection
-            OutlinedCard(
-                onClick = { showDatePicker = true },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.CalendarMonth, 
-                        contentDescription = null, 
-                        tint = MaterialTheme.colorScheme.primary
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault()).format(uiState.date.time),
+                    onValueChange = {},
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Date") },
+                    leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    shape = RoundedCornerShape(12.dp),
+                    readOnly = true,
+                    enabled = false,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledLabelColor = MaterialTheme.colorScheme.primary,
+                        disabledLeadingIconColor = MaterialTheme.colorScheme.primary,
                     )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text("Date", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        Text(
-                            SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault()).format(uiState.date.time),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { showDatePicker = true }
+                )
             }
 
             // Meal Type Dropdown
@@ -180,35 +180,6 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                                 }
                             )
                         }
-                    }
-                }
-            }
-
-            // Time Selection
-            OutlinedCard(
-                onClick = { showTimePicker = true },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.Schedule, 
-                        contentDescription = null, 
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text("Time", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        val amPm = if (uiState.hour < 12) "AM" else "PM"
-                        val displayHour = if (uiState.hour % 12 == 0) 12 else uiState.hour % 12
-                        Text(
-                            "%02d:%02d %s".format(displayHour, uiState.minute, amPm),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium
-                        )
                     }
                 }
             }
@@ -282,6 +253,36 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                 }
             }
 
+            // Time Selection
+            Box(modifier = Modifier.fillMaxWidth()) {
+                val amPm = if (uiState.hour < 12) "AM" else "PM"
+                val displayHour = if (uiState.hour % 12 == 0) 12 else uiState.hour % 12
+                val timeStr = "%02d:%02d %s".format(displayHour, uiState.minute, amPm)
+                
+                OutlinedTextField(
+                    value = timeStr,
+                    onValueChange = {},
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Time") },
+                    leadingIcon = { Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    shape = RoundedCornerShape(12.dp),
+                    readOnly = true,
+                    enabled = false,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledLabelColor = MaterialTheme.colorScheme.primary,
+                        disabledLeadingIconColor = MaterialTheme.colorScheme.primary,
+                    )
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { showTimePicker = true }
+                )
+            }
+
             // Notes
             OutlinedTextField(
                 value = uiState.notes,
@@ -332,9 +333,6 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { utcMillis ->
-                        // The DatePicker returns UTC millis (Midnight UTC).
-                        // To get the same DATE in local time, we use a UTC calendar to extract
-                        // the day/month/year and apply them to a local calendar.
                         val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
                             timeInMillis = utcMillis
                         }
