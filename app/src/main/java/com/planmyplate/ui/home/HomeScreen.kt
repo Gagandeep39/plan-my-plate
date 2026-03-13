@@ -8,11 +8,10 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.planmyplate.data.AppDatabase
-import com.planmyplate.data.repository.MealRepository
+import com.planmyplate.PlanMyPlateApp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -22,10 +21,9 @@ fun HomeScreen(
     onOpenSettings: () -> Unit
 ) {
     val context = LocalContext.current
-    val database = remember { AppDatabase.getDatabase(context) }
-    val repository = remember { MealRepository(context, database.mealDao()) }
+    val app = context.applicationContext as PlanMyPlateApp
     val viewModel: TimelineViewModel = viewModel(
-        factory = TimelineViewModelFactory(repository)
+        factory = TimelineViewModelFactory(app.mealRepository)
     )
     
     val dayPlans by viewModel.timelineState.collectAsState()

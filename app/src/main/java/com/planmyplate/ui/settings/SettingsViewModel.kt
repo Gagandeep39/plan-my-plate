@@ -2,12 +2,12 @@ package com.planmyplate.ui.settings
 
 import android.content.Context
 import android.util.Log
-import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.Identity
@@ -15,6 +15,7 @@ import com.google.android.gms.common.api.Scope
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.api.services.calendar.CalendarScopes
+import com.planmyplate.data.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,29 +29,27 @@ data class SettingsUiState(
     val isSyncing: Boolean = false
 )
 
-class SettingsViewModel : ViewModel() {
+class SettingsViewModel(private val userRepository: UserRepository) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     private val calendarScope = Scope(CalendarScopes.CALENDAR)
 
-    fun checkGoogleConnection(context: Context) {
-        val sharedPrefs = context.getSharedPreferences("plan_my_plate_prefs", Context.MODE_PRIVATE)
-        val savedEmail = sharedPrefs.getString("user_email", null)
-        val isAuthorized = sharedPrefs.getBoolean("calendar_authorized", false)
-        
-        _uiState.update { 
-            it.copy(
-                isGoogleConnected = savedEmail != null && isAuthorized,
-                userEmail = savedEmail,
-                error = null
-            )
+    init {
+        viewModelScope.launch {
+            userRepository.userEmail.collect { email ->
+                _uiState.update { it.copy(userEmail = email) }
+            }
+        }
+        viewModelScope.launch {
+            userRepository.isCalendarAuthorized.collect { authorized ->
+                _uiState.update { it.copy(isGoogleConnected = authorized) }
+            }
         }
     }
 
     fun signIn(context: Context, onAuthResolutionRequired: (android.app.PendingIntent) -> Unit) {
         val credentialManager = CredentialManager.create(context)
-        
         val serverClientId = "468906434207-oj1asrjtq2htvbch6dls24vg4an7gs6g.apps.googleusercontent.com"
 
         val googleIdOption = GetGoogleIdOption.Builder()
@@ -70,11 +69,7 @@ class SettingsViewModel : ViewModel() {
                 
                 if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                    val email = googleIdTokenCredential.id
-                    
-                    context.getSharedPreferences("plan_my_plate_prefs", Context.MODE_PRIVATE)
-                        .edit().putString("user_email", email).apply()
-
+                    userRepository.saveUser(googleIdTokenCredential.id)
                     requestCalendarAuthorization(context, onAuthResolutionRequired)
                 }
             } catch (e: GetCredentialException) {
@@ -95,9 +90,7 @@ class SettingsViewModel : ViewModel() {
                 if (authorizationResult.hasResolution()) {
                     authorizationResult.pendingIntent?.let { onResolutionRequired(it) }
                 } else {
-                    context.getSharedPreferences("plan_my_plate_prefs", Context.MODE_PRIVATE)
-                        .edit().putBoolean("calendar_authorized", true).apply()
-                    _uiState.update { it.copy(isGoogleConnected = true) }
+                    userRepository.setCalendarAuthorized(true)
                 }
             }
             .addOnFailureListener { e ->
@@ -106,29 +99,28 @@ class SettingsViewModel : ViewModel() {
             }
     }
 
-    fun handleAuthorizationResult(context: Context, success: Boolean) {
+    fun handleAuthorizationResult(success: Boolean) {
         if (success) {
-            context.getSharedPreferences("plan_my_plate_prefs", Context.MODE_PRIVATE)
-                .edit().putBoolean("calendar_authorized", true).apply()
-            checkGoogleConnection(context)
+            userRepository.setCalendarAuthorized(true)
         } else {
             _uiState.update { it.copy(error = "Authorization cancelled or failed") }
         }
     }
 
-    fun disconnectGoogle(context: Context, onDone: () -> Unit) {
+    fun disconnectGoogle(onDone: () -> Unit) {
         viewModelScope.launch {
-            val credentialManager = CredentialManager.create(context)
-            credentialManager.clearCredentialState(ClearCredentialStateRequest())
-            
-            context.getSharedPreferences("plan_my_plate_prefs", Context.MODE_PRIVATE)
-                .edit()
-                .remove("user_email")
-                .remove("calendar_authorized")
-                .apply()
-                
-            _uiState.update { it.copy(isGoogleConnected = false, userEmail = null) }
+            userRepository.logout()
             onDone()
         }
+    }
+}
+
+class SettingsViewModelFactory(private val userRepository: UserRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return SettingsViewModel(userRepository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

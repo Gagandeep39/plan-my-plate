@@ -20,22 +20,23 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.planmyplate.PlanMyPlateApp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    val viewModel: SettingsViewModel = viewModel()
+    val app = context.applicationContext as PlanMyPlateApp
+    
+    val viewModel: SettingsViewModel = viewModel(
+        factory = SettingsViewModelFactory(app.userRepository)
+    )
     val uiState by viewModel.uiState.collectAsState()
 
     val authLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
-        viewModel.handleAuthorizationResult(context, result.resultCode == Activity.RESULT_OK)
-    }
-
-    LaunchedEffect(Unit) {
-        viewModel.checkGoogleConnection(context)
+        viewModel.handleAuthorizationResult(result.resultCode == Activity.RESULT_OK)
     }
 
     Scaffold(
@@ -114,7 +115,7 @@ fun SettingsScreen(onBack: () -> Unit) {
 
                     if (uiState.isGoogleConnected) {
                         Button(
-                            onClick = { viewModel.disconnectGoogle(context) { viewModel.checkGoogleConnection(context) } },
+                            onClick = { viewModel.disconnectGoogle { } },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer)
                         ) {

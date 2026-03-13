@@ -22,8 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.planmyplate.data.AppDatabase
-import com.planmyplate.data.repository.MealRepository
+import com.planmyplate.PlanMyPlateApp
 import com.planmyplate.model.MealType
 import java.text.SimpleDateFormat
 import java.util.*
@@ -32,11 +31,10 @@ import java.util.*
 @Composable
 fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
     val context = LocalContext.current
-    val database = remember { AppDatabase.getDatabase(context) }
-    val repository = remember { MealRepository(context, database.mealDao()) }
+    val app = context.applicationContext as PlanMyPlateApp
 
     val viewModel: MealFormViewModel = viewModel(
-        factory = MealFormViewModelFactory(repository, sessionId)
+        factory = MealFormViewModelFactory(app.mealRepository, sessionId)
     )
     val uiState by viewModel.uiState.collectAsState()
 
