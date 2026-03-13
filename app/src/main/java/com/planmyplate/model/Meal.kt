@@ -16,7 +16,7 @@ data class Meal(
 }
 
 enum class MealType {
-    BREAKFAST, LUNCH, DINNER
+    BREAKFAST, LUNCH, DINNER, SNACK
 }
 
 data class DayPlan(

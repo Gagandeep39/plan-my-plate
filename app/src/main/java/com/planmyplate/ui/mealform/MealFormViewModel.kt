@@ -24,7 +24,7 @@ data class MealFormUiState(
     val notes: String = "",
     val isSaved: Boolean = false,
     val isDeleted: Boolean = false,
-    val mealSession: MealSession? = null // Store the original session for deletion
+    val mealSession: MealSession? = null 
 )
 
 class MealFormViewModel(
@@ -71,6 +71,7 @@ class MealFormViewModel(
         val (defaultHour, defaultMinute) = when (type) {
             MealType.BREAKFAST -> 9 to 0
             MealType.LUNCH -> 13 to 0
+            MealType.SNACK -> 16 to 0
             MealType.DINNER -> 18 to 30
         }
         _uiState.update { it.copy(mealType = type, hour = defaultHour, minute = defaultMinute) }

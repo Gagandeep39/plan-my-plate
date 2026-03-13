@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -56,6 +57,7 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
     )
 
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showMealTypeMenu by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isSaved, uiState.isDeleted) {
         if (uiState.isSaved || uiState.isDeleted) {
@@ -63,7 +65,6 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
         }
     }
 
-    // Auto-scroll to bottom when a dish is added
     LaunchedEffect(uiState.dishes.size) {
         if (uiState.dishes.isNotEmpty()) {
             scrollState.animateScrollTo(scrollState.maxValue)
@@ -143,27 +144,41 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                 }
             }
 
-            // Meal Type Selection
+            // Meal Type Dropdown
             Column {
                 Text("Meal Type", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(12.dp))
-                SingleChoiceSegmentedButtonRow(
+                
+                ExposedDropdownMenuBox(
+                    expanded = showMealTypeMenu,
+                    onExpandedChange = { showMealTypeMenu = it },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    val mealTypes = MealType.entries
-                    mealTypes.forEachIndexed { index, type ->
-                        SegmentedButton(
-                            shape = SegmentedButtonDefaults.itemShape(index = index, count = mealTypes.size),
-                            onClick = { viewModel.onMealTypeSelected(type) },
-                            selected = uiState.mealType == type,
-                            label = { 
-                                Text(
-                                    type.name.lowercase().replaceFirstChar { it.uppercase() },
-                                    maxLines = 1,
-                                    fontSize = 14.sp 
-                                ) 
-                            }
-                        )
+                    OutlinedTextField(
+                        value = uiState.mealType.name.lowercase().replaceFirstChar { it.uppercase() },
+                        onValueChange = {},
+                        readOnly = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showMealTypeMenu) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                    )
+                    
+                    ExposedDropdownMenu(
+                        expanded = showMealTypeMenu,
+                        onDismissRequest = { showMealTypeMenu = false }
+                    ) {
+                        MealType.entries.forEach { type ->
+                            DropdownMenuItem(
+                                text = { Text(type.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                                onClick = {
+                                    viewModel.onMealTypeSelected(type)
+                                    showMealTypeMenu = false
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -277,20 +292,10 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                 shape = RoundedCornerShape(12.dp),
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Sentences
-                ),
-                leadingIcon = {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack, // Placeholder icon or similar
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(0.dp) // Hide but keep spacing consistent if needed
-                    )
-                }
+                )
             )
             
-            // Remove the notes leading icon hack and just use standard
-            
-            Spacer(modifier = Modifier.height(120.dp)) // Extra space for keyboard and bottom bar
+            Spacer(modifier = Modifier.height(120.dp))
         }
     }
 
