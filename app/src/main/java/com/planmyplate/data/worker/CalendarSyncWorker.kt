@@ -19,7 +19,16 @@ class CalendarSyncWorker(
     workerParams: WorkerParameters
 ) : CoroutineWorker(appContext, workerParams) {
 
+    private fun isCalendarAuthorized(): Boolean {
+        val sharedPrefs = applicationContext.getSharedPreferences("plan_my_plate_prefs", Context.MODE_PRIVATE)
+        return sharedPrefs.getBoolean("calendar_authorized", false)
+    }
+
     override suspend fun doWork(): Result {
+        if (!isCalendarAuthorized()) {
+            return Result.success()
+        }
+
         val sessionId = inputData.getLong("sessionId", -1L)
         if (sessionId == -1L) return Result.failure()
 

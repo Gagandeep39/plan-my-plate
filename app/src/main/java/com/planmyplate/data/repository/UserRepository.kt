@@ -3,6 +3,7 @@ package com.planmyplate.data.repository
 import android.content.Context
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
+import androidx.work.WorkManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +31,9 @@ class UserRepository(private val context: Context) {
     fun setCalendarAuthorized(authorized: Boolean) {
         sharedPrefs.edit().putBoolean("calendar_authorized", authorized).apply()
         _isCalendarAuthorized.value = authorized
+        if (!authorized) {
+            WorkManager.getInstance(context).cancelAllWorkByTag(MealRepository.CALENDAR_SYNC_WORK_TAG)
+        }
     }
 
     fun setDriveAuthorized(authorized: Boolean) {

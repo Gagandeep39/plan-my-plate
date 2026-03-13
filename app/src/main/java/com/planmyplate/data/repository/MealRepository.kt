@@ -13,6 +13,15 @@ class MealRepository(
     private val context: Context,
     private val mealDao: MealDao
 ) {
+    companion object {
+        const val CALENDAR_SYNC_WORK_TAG = "calendar_sync"
+    }
+
+    private fun isCalendarAuthorized(): Boolean {
+        val sharedPrefs = context.getSharedPreferences("plan_my_plate_prefs", Context.MODE_PRIVATE)
+        return sharedPrefs.getBoolean("calendar_authorized", false)
+    }
+
     fun getAllMeals(): Flow<List<MealWithDishes>> = mealDao.getAllMeals()
 
     suspend fun saveMeal(session: MealSession, dishes: List<String>): Long {
@@ -27,7 +36,9 @@ class MealRepository(
             mealDao.insertDishes(dishesToInsert)
         }
 
-        scheduleCalendarSync(sessionId)
+        if (isCalendarAuthorized()) {
+            scheduleCalendarSync(sessionId)
+        }
 
         return sessionId
     }
@@ -36,13 +47,14 @@ class MealRepository(
         val eventId = mealDao.getCalendarEventId(session.sessionId)
         
         // Schedule deletion in calendar
-        if (eventId != null) {
+        if (eventId != null && isCalendarAuthorized()) {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
 
             val syncRequest = OneTimeWorkRequestBuilder<CalendarSyncWorker>()
                 .setConstraints(constraints)
+                .addTag(CALENDAR_SYNC_WORK_TAG)
                 .setInputData(workDataOf(
                     "sessionId" to session.sessionId,
                     "isDeletion" to true,
@@ -67,6 +79,7 @@ class MealRepository(
 
         val syncRequest = OneTimeWorkRequestBuilder<CalendarSyncWorker>()
             .setConstraints(constraints)
+            .addTag(CALENDAR_SYNC_WORK_TAG)
             .setInputData(workDataOf("sessionId" to sessionId))
             .build()
 
