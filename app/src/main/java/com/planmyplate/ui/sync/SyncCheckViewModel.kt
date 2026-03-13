@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.planmyplate.PlanMyPlateApp
 import com.planmyplate.data.AppDatabase
 import com.planmyplate.data.repository.DriveRepository
 import com.planmyplate.data.repository.UserRepository
@@ -127,8 +128,9 @@ class SyncCheckViewModel(
             }
 
             withContext(Dispatchers.IO) {
-                // Close Room so we can safely replace the file
-                AppDatabase.closeAndReset()
+                // Close database and clear repository references in Application class
+                (context.applicationContext as? PlanMyPlateApp)?.resetDatabaseReferences()
+                    ?: AppDatabase.closeAndReset()
 
                 val dbFile = context.getDatabasePath("plan_my_plate_db")
                 val walFile = File(dbFile.path + "-wal")
@@ -137,8 +139,8 @@ class SyncCheckViewModel(
                 dbFile.parentFile?.mkdirs()
                 targetFile.copyTo(dbFile, overwrite = true)
                 // Remove stale WAL/SHM so Room opens cleanly against the restored file
-                walFile.delete()
-                shmFile.delete()
+                if (walFile.exists()) walFile.delete()
+                if (shmFile.exists()) shmFile.delete()
 
                 // Record the cloud's modified time as our upload timestamp to avoid
                 // re-detecting a conflict on the next launch

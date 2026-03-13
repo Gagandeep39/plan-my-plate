@@ -49,8 +49,7 @@ class DriveExportWorker(
     }
 
     override suspend fun doWork(): Result {
-        val database = AppDatabase.getDatabase(applicationContext)
-        val syncLogRepository = SyncLogRepository(database.syncLogDao())
+        val syncLogRepository = SyncLogRepository(applicationContext)
 
         if (!isDriveAuthorized()) {
             syncLogRepository.log(
@@ -64,6 +63,7 @@ class DriveExportWorker(
         }
 
         return try {
+            val database = AppDatabase.getDatabase(applicationContext)
             val mealDao = database.mealDao()
             val driveRepository = DriveRepository(applicationContext)
 

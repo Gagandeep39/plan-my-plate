@@ -41,7 +41,8 @@ import java.util.Locale
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    onOpenSyncHistory: () -> Unit
+    onOpenSyncHistory: () -> Unit,
+    onNavigateToSyncCheck: () -> Unit
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as PlanMyPlateApp
@@ -179,7 +180,6 @@ fun SettingsScreen(
                             onDisconnect = { viewModel.disconnectCalendar() }
                         )
 
-                        var shouldNavigateToSyncCheck by remember { mutableStateOf(false) }
                         DriveCard(
                             uiState = uiState,
                             onConnect = {
@@ -191,22 +191,12 @@ fun SettingsScreen(
                             onRefreshLink = { viewModel.refreshDriveLink() },
                             onDbSyncToggle = { enabled ->
                                 viewModel.setDbSyncEnabled(enabled)
-                                if (enabled) shouldNavigateToSyncCheck = true
+                                if (enabled) {
+                                    onNavigateToSyncCheck()
+                                }
                             },
                             onSyncNow = { viewModel.syncDbNow() }
                         )
-                        if (shouldNavigateToSyncCheck) {
-                            // Use LaunchedEffect to navigate only once
-                            LaunchedEffect(Unit) {
-                                // Replace with your navigation logic to sync_check screen
-                                // For example, if using NavController:
-                                // navController.navigate("sync_check")
-                                // Here, we assume a function navigateToSyncCheck() is available
-                                // navigateToSyncCheck()
-                                // Reset flag
-                                shouldNavigateToSyncCheck = false
-                            }
-                        }
                     }
                 }
             }

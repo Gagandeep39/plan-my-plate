@@ -33,7 +33,7 @@ class DriveRepository(private val context: Context) {
         message: String,
         sessionId: Long? = null
     ) {
-        SyncLogRepository(AppDatabase.getDatabase(context).syncLogDao()).log(
+        SyncLogRepository(context).log(
             service = SyncLog.SERVICE_DRIVE,
             action = action,
             status = status,

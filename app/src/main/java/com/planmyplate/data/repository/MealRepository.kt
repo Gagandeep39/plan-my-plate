@@ -2,6 +2,7 @@ package com.planmyplate.data.repository
 
 import android.content.Context
 import androidx.work.*
+import com.planmyplate.data.AppDatabase
 import com.planmyplate.data.MealDao
 import com.planmyplate.data.worker.CalendarSyncWorker
 import com.planmyplate.data.worker.DriveExportWorker
@@ -11,9 +12,11 @@ import com.planmyplate.model.MealWithDishes
 import kotlinx.coroutines.flow.Flow
 
 class MealRepository(
-    private val context: Context,
-    private val mealDao: MealDao
+    private val context: Context
 ) {
+    private val mealDao: MealDao
+        get() = AppDatabase.getDatabase(context).mealDao()
+
     companion object {
         const val CALENDAR_SYNC_WORK_TAG = "calendar_sync"
     }

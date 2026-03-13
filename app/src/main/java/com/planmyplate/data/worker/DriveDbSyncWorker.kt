@@ -10,9 +10,9 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.planmyplate.PlanMyPlateApp
 import com.planmyplate.data.AppDatabase
 import com.planmyplate.data.repository.DriveRepository
-import com.planmyplate.data.repository.SyncLogRepository
 import com.planmyplate.data.repository.UserRepository
 import com.planmyplate.model.SyncLog
 import java.io.File
@@ -68,8 +68,9 @@ class DriveDbSyncWorker(
 
     override suspend fun doWork(): Result {
         val prefs = applicationContext.getSharedPreferences(UserRepository.PREFS_NAME, Context.MODE_PRIVATE)
+        val app = applicationContext as PlanMyPlateApp
         val database = AppDatabase.getDatabase(applicationContext)
-        val syncLogRepo = SyncLogRepository(database.syncLogDao())
+        val syncLogRepo = app.syncLogRepository
 
         if (!prefs.getBoolean(UserRepository.KEY_DRIVE_AUTHORIZED, false) ||
             !prefs.getBoolean(UserRepository.KEY_DB_SYNC_ENABLED, false)
@@ -88,34 +89,25 @@ class DriveDbSyncWorker(
             val dbFile = applicationContext.getDatabasePath("plan_my_plate_db")
             val cacheFile = File(applicationContext.cacheDir, "plan_my_plate_backup.db")
             
-            // Ensure any existing cache file is gone so we don't upload old data if this fails
             if (cacheFile.exists()) cacheFile.delete()
 
-            // 1. Try modern VACUUM INTO (API 29+) for a safe, single-file hot backup
             var backupReady = false
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 try {
                     database.openHelper.writableDatabase.execSQL("VACUUM INTO '${cacheFile.absolutePath}'")
                     backupReady = cacheFile.exists() && cacheFile.length() > 0
-                } catch (e: Exception) {
-                    // Fallback to checkpoint if VACUUM INTO fails
-                }
+                } catch (e: Exception) { }
             }
 
-            // 2. Fallback to Checkpoint + Copy
             if (!backupReady) {
-                // Use TRUNCATE checkpoint to force everything into the main file and reset WAL
                 try {
                     database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { cursor ->
                         val busy = if (cursor.moveToFirst()) cursor.getInt(0) else 1
                         if (busy == 1) {
-                            // If busy, we can't guarantee the main file is complete. Try FULL.
                             database.openHelper.writableDatabase.execSQL("PRAGMA wal_checkpoint(FULL)")
                         }
                     }
-                } catch (e: Exception) {
-                    // Ignore checkpoint errors and try copy anyway, but it might be incomplete
-                }
+                } catch (e: Exception) { }
                 
                 if (dbFile.exists()) {
                     dbFile.copyTo(cacheFile, overwrite = true)
@@ -123,9 +115,8 @@ class DriveDbSyncWorker(
                 }
             }
 
-            if (!backupReady) throw Exception("Failed to create a valid database backup file")
+            if (!backupReady) throw Exception("Failed to create backup file")
 
-            // Never overwrite with an empty database (sanity check)
             val mealCount = database.mealDao().getMealCount()
             if (mealCount == 0) {
                  syncLogRepo.log(

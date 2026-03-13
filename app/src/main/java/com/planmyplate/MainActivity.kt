@@ -95,7 +95,10 @@ fun AppNavigation() {
         composable("settings") {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
-                onOpenSyncHistory = { navController.navigate("sync_history") }
+                onOpenSyncHistory = { navController.navigate("sync_history") },
+                onNavigateToSyncCheck = {
+                    navController.navigate("sync_check")
+                }
             )
         }
         composable("sync_history") {
