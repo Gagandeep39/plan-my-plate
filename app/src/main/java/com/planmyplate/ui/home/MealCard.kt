@@ -8,12 +8,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,6 +32,7 @@ fun MealCard(
 ) {
     val dotCenterY = 26.dp
     val itemGap = 16.dp
+    val mealColor = MealTypeIcons.getColor(meal.type)
 
     Row(
         modifier = Modifier
@@ -76,13 +78,13 @@ fun MealCard(
                     modifier = Modifier
                         .size(dotSize)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                        .background(mealColor.copy(alpha = 0.3f))
                 )
                 Box(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
+                        .background(mealColor)
                 )
             }
         }
@@ -102,7 +104,7 @@ fun MealCard(
                     containerColor = if (isSelected) 
                         MaterialTheme.colorScheme.primaryContainer 
                     else 
-                        MaterialTheme.colorScheme.surface
+                        Color.Transparent
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 shape = RoundedCornerShape(16.dp),
@@ -111,45 +113,51 @@ fun MealCard(
                     if (isSelected) 
                         MaterialTheme.colorScheme.primary 
                     else 
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                 )
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    mealColor.copy(alpha = 0.15f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = meal.name, 
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.sp), 
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = meal.type.name.lowercase().replaceFirstChar { it.uppercase() }, 
-                            style = MaterialTheme.typography.labelLarge, 
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = meal.formattedTime, 
-                            style = MaterialTheme.typography.bodySmall, 
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    
-                    if (isSelected) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "Selected",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    } else {
-                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), modifier = Modifier.size(40.dp)) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(imageVector = Icons.Default.Restaurant, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                            }
+                    Row(
+                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = meal.name, 
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.sp), 
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = meal.type.name.lowercase().replaceFirstChar { it.uppercase() }, 
+                                style = MaterialTheme.typography.labelLarge, 
+                                color = mealColor,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = meal.formattedTime, 
+                                style = MaterialTheme.typography.bodySmall, 
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Selected",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(32.dp)
+                            )
                         }
                     }
                 }
