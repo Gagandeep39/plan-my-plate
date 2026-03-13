@@ -8,6 +8,10 @@ import com.planmyplate.data.repository.UserRepository
 
 class PlanMyPlateApp : Application() {
     private val database by lazy { AppDatabase.getDatabase(this) }
+
+    val driveRepository by lazy {
+        DriveRepository(this)
+    }
     
     val mealRepository by lazy { 
         MealRepository(this, database.mealDao()) 
@@ -15,9 +19,5 @@ class PlanMyPlateApp : Application() {
     
     val userRepository by lazy {
         UserRepository(this)
-    }
-
-    val driveRepository by lazy {
-        DriveRepository(this)
     }
 }

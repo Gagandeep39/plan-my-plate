@@ -14,6 +14,10 @@ interface MealDao {
     fun getAllMeals(): Flow<List<MealWithDishes>>
 
     @Transaction
+    @Query("SELECT * FROM meal_sessions WHERE scheduledTimestamp BETWEEN :startInclusive AND :endInclusive ORDER BY scheduledTimestamp ASC")
+    suspend fun getMealsInRange(startInclusive: Long, endInclusive: Long): List<MealWithDishes>
+
+    @Transaction
     @Query("SELECT * FROM meal_sessions WHERE sessionId = :sessionId")
     suspend fun getMealWithDishes(sessionId: Long): MealWithDishes?
 

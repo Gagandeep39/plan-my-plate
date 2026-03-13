@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.*
 import com.planmyplate.data.MealDao
 import com.planmyplate.data.worker.CalendarSyncWorker
+import com.planmyplate.data.worker.DriveExportWorker
 import com.planmyplate.model.Dish
 import com.planmyplate.model.MealSession
 import com.planmyplate.model.MealWithDishes
@@ -18,8 +19,18 @@ class MealRepository(
     }
 
     private fun isCalendarAuthorized(): Boolean {
-        val sharedPrefs = context.getSharedPreferences("plan_my_plate_prefs", Context.MODE_PRIVATE)
-        return sharedPrefs.getBoolean("calendar_authorized", false)
+        val sharedPrefs = context.getSharedPreferences(UserRepository.PREFS_NAME, Context.MODE_PRIVATE)
+        return sharedPrefs.getBoolean(UserRepository.KEY_CALENDAR_AUTHORIZED, false)
+    }
+
+    private fun isDriveAuthorized(): Boolean {
+        val sharedPrefs = context.getSharedPreferences(UserRepository.PREFS_NAME, Context.MODE_PRIVATE)
+        return sharedPrefs.getBoolean(UserRepository.KEY_DRIVE_AUTHORIZED, false)
+    }
+
+    private fun scheduleDriveExportSync() {
+        if (!isDriveAuthorized()) return
+        DriveExportWorker.enqueue(context)
     }
 
     fun getAllMeals(): Flow<List<MealWithDishes>> = mealDao.getAllMeals()
@@ -39,6 +50,8 @@ class MealRepository(
         if (isCalendarAuthorized()) {
             scheduleCalendarSync(sessionId)
         }
+
+        scheduleDriveExportSync()
 
         return sessionId
     }
@@ -69,7 +82,10 @@ class MealRepository(
             )
         }
         
+        mealDao.deleteDishesForSession(session.sessionId)
+        mealDao.deleteCalendarMapping(session.sessionId)
         mealDao.deleteSession(session)
+        scheduleDriveExportSync()
     }
 
     private fun scheduleCalendarSync(sessionId: Long) {

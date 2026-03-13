@@ -154,6 +154,7 @@ class SettingsViewModel(
                     authorizationResult.pendingIntent?.let { onResolutionRequired(it) }
                 } else {
                     userRepository.setDriveAuthorized(true)
+                    userRepository.enqueueDriveExportSync()
                     // refreshDriveLink() is called by the init collector reacting to isDriveAuthorized
                 }
             }
@@ -169,6 +170,7 @@ class SettingsViewModel(
                 AuthStep.CALENDAR_ONLY -> userRepository.setCalendarAuthorized(true)
                 AuthStep.DRIVE_ONLY -> {
                     userRepository.setDriveAuthorized(true)
+                    userRepository.enqueueDriveExportSync()
                     // refreshDriveLink() is called by the init collector reacting to isDriveAuthorized
                 }
                 else -> {}
@@ -197,6 +199,7 @@ class SettingsViewModel(
             val link = driveRepository.createOrGetSharableJsonFile()
             if (link != null) {
                 userRepository.saveSharableLink(link)
+                userRepository.enqueueDriveExportSync()
                 _uiState.update { it.copy(isLoadingLink = false) }
             } else {
                 _uiState.update { it.copy(isLoadingLink = false, error = "Could not load Drive link. Tap retry to try again.") }
