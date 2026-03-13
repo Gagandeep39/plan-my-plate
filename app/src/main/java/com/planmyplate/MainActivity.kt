@@ -4,7 +4,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -12,6 +16,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.planmyplate.ui.home.HomeScreen
 import com.planmyplate.ui.mealform.MealForm
+import com.planmyplate.ui.navigation.NavTransitions
 import com.planmyplate.ui.settings.SettingsScreen
 import com.planmyplate.ui.theme.PlanMyPlateTheme
 
@@ -21,7 +26,12 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PlanMyPlateTheme {
-                AppNavigation()
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    AppNavigation()
+                }
             }
         }
     }
@@ -30,7 +40,14 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
-    NavHost(navController = navController, startDestination = "timeline") {
+    NavHost(
+        navController = navController, 
+        startDestination = "timeline",
+        enterTransition = NavTransitions.enterTransition,
+        exitTransition = NavTransitions.exitTransition,
+        popEnterTransition = NavTransitions.popEnterTransition,
+        popExitTransition = NavTransitions.popExitTransition
+    ) {
         composable("timeline") {
             HomeScreen(
                 onAddMeal = {
