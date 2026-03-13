@@ -79,6 +79,9 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
+    // WorkManager for background sync
+    implementation(libs.androidx.work.runtime.ktx)
+
     // Handles Google Sign-In and requesting Drive permissions
     implementation(libs.play.services.auth)
     // Core Google REST API clients for Android

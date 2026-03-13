@@ -12,7 +12,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.planmyplate.data.AppDatabase
-import com.planmyplate.data.repository.CalendarRepository
 import com.planmyplate.data.repository.MealRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -24,8 +23,7 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val database = remember { AppDatabase.getDatabase(context) }
-    val calendarRepository = remember { CalendarRepository(context) }
-    val repository = remember { MealRepository(database.mealDao(), calendarRepository) }
+    val repository = remember { MealRepository(context, database.mealDao()) }
     val viewModel: TimelineViewModel = viewModel(
         factory = TimelineViewModelFactory(repository)
     )

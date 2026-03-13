@@ -1,8 +1,10 @@
 package com.planmyplate.data.repository
 
 import android.content.Context
+import android.util.Log
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
+import com.google.api.client.googleapis.extensions.android.gms.auth.UserRecoverableAuthIOException
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.client.util.DateTime
@@ -32,25 +34,46 @@ class CalendarRepository(private val context: Context) {
         ).setApplicationName("Plan My Plate").build()
     }
 
+    suspend fun findExistingEventId(sessionId: Long): String? = withContext(Dispatchers.IO) {
+        val service = getCalendarService() ?: return@withContext null
+        try {
+            // Search for events with our custom property
+            val events = service.events().list("primary")
+                .setPrivateExtendedProperty(listOf("planMyPlateSessionId=$sessionId"))
+                .execute()
+            events.items.firstOrNull()?.id
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     suspend fun createEvent(mealSession: MealSession, dishNames: List<String>): String? = withContext(Dispatchers.IO) {
         val service = getCalendarService() ?: return@withContext null
 
         val event = Event().apply {
-            summary = "Meal: ${mealSession.mealType.lowercase().replaceFirstChar { it.uppercase() }}"
-            description = dishNames.joinToString(", ") + (mealSession.notes?.let { "\nNotes: $it" } ?: "")
+            summary = mealSession.mealType.lowercase().replaceFirstChar { it.uppercase() } + ": " + dishNames.joinToString(", ")
+            description = (mealSession.notes?.let { "\nNotes: $it" } ?: "")
             
             val start = DateTime(mealSession.scheduledTimestamp)
             val end = DateTime(mealSession.scheduledTimestamp + 3600000) // 1 hour duration
             
             setStart(EventDateTime().setDateTime(start))
             setEnd(EventDateTime().setDateTime(end))
+
+            // Add metadata to prevent duplicates
+            extendedProperties = Event.ExtendedProperties().apply {
+                private = mapOf("planMyPlateSessionId" to mealSession.sessionId.toString())
+            }
         }
 
         try {
             val createdEvent = service.events().insert("primary", event).execute()
             createdEvent.id
+        } catch (e: UserRecoverableAuthIOException) {
+            Log.e("CalendarRepository", "Auth consent required", e)
+            throw e
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("CalendarRepository", "Error creating event", e)
             null
         }
     }
@@ -61,8 +84,8 @@ class CalendarRepository(private val context: Context) {
         try {
             val event = service.events().get("primary", calendarEventId).execute()
             event.apply {
-                summary = "Meal: ${mealSession.mealType.lowercase().replaceFirstChar { it.uppercase() }}"
-                description = dishNames.joinToString(", ") + (mealSession.notes?.let { "\nNotes: $it" } ?: "")
+                summary = mealSession.mealType.lowercase().replaceFirstChar { it.uppercase() } + ": " + dishNames.joinToString(", ")
+                description = (mealSession.notes?.let { "\nNotes: $it" } ?: "")
                 
                 val start = DateTime(mealSession.scheduledTimestamp)
                 val end = DateTime(mealSession.scheduledTimestamp + 3600000)
@@ -72,8 +95,10 @@ class CalendarRepository(private val context: Context) {
             }
 
             service.events().update("primary", calendarEventId, event).execute()
+        } catch (e: UserRecoverableAuthIOException) {
+            throw e
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("CalendarRepository", "Error updating event", e)
         }
     }
 
@@ -81,8 +106,10 @@ class CalendarRepository(private val context: Context) {
         val service = getCalendarService() ?: return@withContext
         try {
             service.events().delete("primary", calendarEventId).execute()
+        } catch (e: UserRecoverableAuthIOException) {
+            throw e
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("CalendarRepository", "Error deleting event", e)
         }
     }
 }

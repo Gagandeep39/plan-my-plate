@@ -13,6 +13,10 @@ interface MealDao {
     @Query("SELECT * FROM meal_sessions ORDER BY scheduledTimestamp DESC")
     fun getAllMeals(): Flow<List<MealWithDishes>>
 
+    @Transaction
+    @Query("SELECT * FROM meal_sessions WHERE sessionId = :sessionId")
+    suspend fun getMealWithDishes(sessionId: Long): MealWithDishes?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSession(session: MealSession): Long
 
@@ -30,4 +34,7 @@ interface MealDao {
 
     @Query("DELETE FROM meal_calendar_mappings WHERE sessionId = :sessionId")
     suspend fun deleteCalendarMapping(sessionId: Long)
+
+    @Query("DELETE FROM dishes WHERE parentSessionId = :sessionId")
+    suspend fun deleteDishesForSession(sessionId: Long)
 }
