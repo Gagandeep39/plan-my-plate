@@ -8,24 +8,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.planmyplate.PlanMyPlateApp
 
 @Composable
 fun SyncCheckScreen(
-    isManualSync: Boolean = false,
+    viewModel: SyncCheckViewModel,
     onClear: () -> Unit,
     onRestoreComplete: () -> Unit
 ) {
-    val context = LocalContext.current
-    val app = context.applicationContext as PlanMyPlateApp
-    val viewModel: SyncCheckViewModel = viewModel(
-        factory = SyncCheckViewModelFactory(context, app.driveRepository, app.userRepository, isManualSync)
-    )
     val state by viewModel.state.collectAsState()
 
     LaunchedEffect(state) {
@@ -38,7 +30,7 @@ fun SyncCheckScreen(
 
     when (val s = state) {
         is SyncCheckState.Checking, SyncCheckState.Skipped, SyncCheckState.Clear -> {
-            SyncLoadingScreen("Checking for updates…")
+            SyncLoadingScreen("Syncing…")
         }
 
         is SyncCheckState.Restoring -> {

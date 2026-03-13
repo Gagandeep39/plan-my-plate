@@ -4,11 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -28,14 +24,29 @@ import com.planmyplate.ui.settings.SettingsScreen
 import com.planmyplate.ui.settings.SyncHistoryScreen
 import com.planmyplate.ui.theme.PlanMyPlateTheme
 import com.planmyplate.ui.sync.SyncCheckScreen
+import com.planmyplate.ui.sync.SyncCheckState
+import com.planmyplate.ui.sync.SyncCheckViewModel
+import com.planmyplate.ui.sync.SyncCheckViewModelFactory
 
 class MainActivity : ComponentActivity() {
+
+    private val syncCheckViewModel: SyncCheckViewModel by viewModels {
+        val app = application as PlanMyPlateApp
+        SyncCheckViewModelFactory(this, app.driveRepository, app.userRepository, false)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Handle the splash screen transition before calling super.onCreate()
-        installSplashScreen()
+        // Handle the splash screen transition
+        val splashScreen = installSplashScreen()
 
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Keep the splash screen visible while checking for sync updates.
+        // This avoids showing the "Checking for updates..." loading screen if the check is quick.
+        splashScreen.setKeepOnScreenCondition {
+            syncCheckViewModel.state.value is SyncCheckState.Checking
+        }
 
         // Kick off a DB backup on every fresh start (worker handles cooldown + auth checks + change checks)
         (applicationContext as PlanMyPlateApp).userRepository.enqueueDbSync()
@@ -46,7 +57,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppNavigation()
+                    AppNavigation(syncCheckViewModel)
                 }
             }
         }
@@ -60,7 +71,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
     val navController = rememberNavController()
     NavHost(
         navController = navController, 
@@ -96,8 +107,20 @@ fun AppNavigation() {
         ) { backStackEntry ->
             val fromSettings = backStackEntry.arguments?.getBoolean("fromSettings") ?: false
             val activity = (LocalContext.current as? android.app.Activity)
+            
+            // For manual sync from settings, create a fresh ViewModel instance.
+            // For the initial launch, use the activity-scoped ViewModel.
+            val vm = if (fromSettings) {
+                val app = LocalContext.current.applicationContext as PlanMyPlateApp
+                androidx.lifecycle.viewmodel.compose.viewModel(
+                    factory = SyncCheckViewModelFactory(LocalContext.current, app.driveRepository, app.userRepository, true)
+                )
+            } else {
+                syncCheckViewModel
+            }
+
             SyncCheckScreen(
-                isManualSync = fromSettings,
+                viewModel = vm,
                 onClear = {
                     if (fromSettings) {
                         navController.popBackStack()
