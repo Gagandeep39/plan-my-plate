@@ -8,24 +8,64 @@ import com.planmyplate.model.DayPlan
 import com.planmyplate.model.Meal
 import com.planmyplate.model.MealType
 import com.planmyplate.model.MealWithDishes
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
 class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
 
-    val timelineState: StateFlow<List<DayPlan>> = repository.getAllMeals()
+    private val _selectedMealIds = MutableStateFlow<Set<String>>(emptySet())
+    val selectedMealIds: StateFlow<Set<String>> = _selectedMealIds.asStateFlow()
+
+    private val _allMealsWithDishes = MutableStateFlow<List<MealWithDishes>>(emptyList())
+
+    init {
+        viewModelScope.launch {
+            repository.getAllMeals().collect {
+                _allMealsWithDishes.value = it
+            }
+        }
+    }
+
+    val timelineState: StateFlow<List<DayPlan>> = _allMealsWithDishes
         .map { mealsWithDishes ->
             generateTimeline(mealsWithDishes)
         }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = generateTimeline(emptyList())
+            initialValue = emptyList()
         )
+
+    fun toggleSelection(mealId: String) {
+        _selectedMealIds.update { current ->
+            if (current.contains(mealId)) current - mealId else current + mealId
+        }
+    }
+
+    fun clearSelection() {
+        _selectedMealIds.value = emptySet()
+    }
+
+    fun deleteSelectedMeals() {
+        viewModelScope.launch {
+            val idsToDelete = _selectedMealIds.value
+            val mealsToDelete = _allMealsWithDishes.value.filter { it.session.sessionId.toString() in idsToDelete }
+            
+            mealsToDelete.forEach { 
+                repository.deleteMeal(it.session)
+            }
+            clearSelection()
+        }
+    }
 
     private fun generateTimeline(mealsWithDishes: List<MealWithDishes>): List<DayPlan> {
         val dateFormat = SimpleDateFormat("EEEE, MMMM dd", Locale.getDefault())

@@ -1,9 +1,12 @@
 package com.planmyplate.ui.home
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,7 +30,17 @@ fun HomeScreen(
     )
     
     val dayPlans by viewModel.timelineState.collectAsState()
+    val selectedMealIds by viewModel.selectedMealIds.collectAsState()
     val listState = rememberLazyListState()
+
+    val isSelectionMode = selectedMealIds.isNotEmpty()
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    if (isSelectionMode) {
+        BackHandler {
+            viewModel.clearSelection()
+        }
+    }
 
     LaunchedEffect(dayPlans) {
         if (dayPlans.isNotEmpty()) {
@@ -47,13 +60,26 @@ fun HomeScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        "Plan My Plate",
+                        if (isSelectionMode) "${selectedMealIds.size} Selected" else "Plan My Plate",
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
                     )
                 },
+                navigationIcon = {
+                    if (isSelectionMode) {
+                        IconButton(onClick = { viewModel.clearSelection() }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear Selection")
+                        }
+                    }
+                },
                 actions = {
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    if (isSelectionMode) {
+                        IconButton(onClick = { showDeleteDialog = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete Selected", tint = MaterialTheme.colorScheme.error)
+                        }
+                    } else {
+                        IconButton(onClick = onOpenSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        }
                     }
                 }
             )
@@ -68,10 +94,36 @@ fun HomeScreen(
             dayPlans.forEach { dayPlan ->
                 DailyMealSection(
                     dayPlan = dayPlan,
+                    selectedMealIds = selectedMealIds,
                     onAddMealClick = onAddMeal,
-                    onMealClick = onEditMeal
+                    onMealClick = onEditMeal,
+                    onMealLongClick = { viewModel.toggleSelection(it) }
                 )
             }
         }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Meals") },
+            text = { Text("Are you sure you want to delete ${selectedMealIds.size} selected meal(s)? This will also remove them from your Google Calendar.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteSelectedMeals()
+                        showDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

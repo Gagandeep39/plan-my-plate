@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
@@ -49,8 +50,10 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
         initialMinute = uiState.minute
     )
 
-    LaunchedEffect(uiState.isSaved) {
-        if (uiState.isSaved) {
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.isSaved, uiState.isDeleted) {
+        if (uiState.isSaved || uiState.isDeleted) {
             onBack()
         }
     }
@@ -62,6 +65,13 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    if (sessionId != null) {
+                        IconButton(onClick = { showDeleteDialog = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete Meal", tint = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             )
@@ -224,6 +234,31 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                 Text(if (sessionId == null) "Schedule Meal" else "Update Meal")
             }
         }
+    }
+
+    // Deletion Confirmation Dialog
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Meal") },
+            text = { Text("Are you sure you want to delete this scheduled meal? This will also remove it from your Google Calendar.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteMeal()
+                        showDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     // Date Picker Dialog

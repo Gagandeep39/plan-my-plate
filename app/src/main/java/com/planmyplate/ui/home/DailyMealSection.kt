@@ -12,8 +12,10 @@ import com.planmyplate.model.DayPlan
 @OptIn(ExperimentalFoundationApi::class)
 fun LazyListScope.DailyMealSection(
     dayPlan: DayPlan,
+    selectedMealIds: Set<String>,
     onAddMealClick: () -> Unit,
-    onMealClick: (Long) -> Unit
+    onMealClick: (Long) -> Unit,
+    onMealLongClick: (String) -> Unit
 ) {
     stickyHeader {
         HeaderItem(
@@ -31,7 +33,15 @@ fun LazyListScope.DailyMealSection(
             meal = meal,
             isFirst = index == 0,
             isLast = false,
-            onClick = { onMealClick(meal.id.toLong()) }
+            isSelected = selectedMealIds.contains(meal.id),
+            onClick = { 
+                if (selectedMealIds.isNotEmpty()) {
+                    onMealLongClick(meal.id)
+                } else {
+                    onMealClick(meal.id.toLong()) 
+                }
+            },
+            onLongClick = { onMealLongClick(meal.id) }
         )
     }
 

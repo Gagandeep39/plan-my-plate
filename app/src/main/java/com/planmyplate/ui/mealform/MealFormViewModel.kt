@@ -22,7 +22,9 @@ data class MealFormUiState(
     val dishes: List<String> = emptyList(),
     val currentDishName: String = "",
     val notes: String = "",
-    val isSaved: Boolean = false
+    val isSaved: Boolean = false,
+    val isDeleted: Boolean = false,
+    val mealSession: MealSession? = null // Store the original session for deletion
 )
 
 class MealFormViewModel(
@@ -52,7 +54,8 @@ class MealFormViewModel(
                             hour = cal.get(Calendar.HOUR_OF_DAY),
                             minute = cal.get(Calendar.MINUTE),
                             dishes = mealWithDishes.dishes.map { d -> d.dishName },
-                            notes = mealWithDishes.session.notes ?: ""
+                            notes = mealWithDishes.session.notes ?: "",
+                            mealSession = mealWithDishes.session
                         )
                     }
                 }
@@ -128,6 +131,16 @@ class MealFormViewModel(
             
             repository.saveMeal(session, finalDishes)
             _uiState.update { it.copy(isSaved = true) }
+        }
+    }
+
+    fun deleteMeal() {
+        viewModelScope.launch {
+            val session = _uiState.value.mealSession
+            if (session != null) {
+                repository.deleteMeal(session)
+                _uiState.update { it.copy(isDeleted = true) }
+            }
         }
     }
 }
