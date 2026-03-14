@@ -41,7 +41,7 @@ class CalendarSyncWorker(
             var message = ""
             if (existingEventId != null) {
                 calendarRepository.updateEvent(existingEventId, mealWithDishes.session, mealWithDishes.dishes.map { it.dishName })
-                message = "Updated meal in calendar with ID $existingEventId"
+                message = "Updated meal in calendar"
             } else {
                 val createdEventId = calendarRepository.createEvent(mealWithDishes.session, mealWithDishes.dishes.map { it.dishName })
                 if (createdEventId != null) {
@@ -49,7 +49,7 @@ class CalendarSyncWorker(
                         com.planmyplate.model.MealCalendarMapping(sessionId, createdEventId)
                     )
                 }
-                message = "Created meal in calendar with ID $createdEventId"
+                message = "Created meal in calendar"
             }
 
             syncLogRepository.log(
