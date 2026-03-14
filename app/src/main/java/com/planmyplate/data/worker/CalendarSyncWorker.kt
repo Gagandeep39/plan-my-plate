@@ -7,14 +7,7 @@ import com.planmyplate.data.AppDatabase
 import com.planmyplate.data.repository.DriveRepository
 import com.planmyplate.data.repository.SyncLogRepository
 import com.planmyplate.model.SyncLog
-import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
-import com.google.api.client.http.javanet.NetHttpTransport
-import com.google.api.client.json.gson.GsonFactory
-import com.google.api.services.calendar.Calendar
-import com.google.api.services.calendar.CalendarScopes
-import com.google.api.services.calendar.model.Event
-import com.google.api.services.calendar.model.EventDateTime
-import com.planmyplate.util.AuthAccountResolver
+import com.planmyplate.data.repository.CalendarRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Collections
@@ -29,38 +22,15 @@ class CalendarSyncWorker(
         val syncLogRepository = SyncLogRepository(applicationContext)
         val sessionId = inputData.getLong("sessionId", -1L)
         val isDeletion = inputData.getBoolean("isDeletion", false)
+        val calendarEventId = inputData.getString("calendarEventId")
+        val calendarRepository = CalendarRepository(applicationContext)
 
         if (sessionId == -1L && !isDeletion) return@withContext Result.failure()
 
         try {
-            val account = AuthAccountResolver.resolveGoogleAccount(applicationContext)
-            if (account == null) {
-                syncLogRepository.log(
-                    SyncLog.SERVICE_CALENDAR,
-                    "Sync Meal",
-                    SyncLog.STATUS_FAILURE,
-                    SyncLog.SOURCE_QUEUE,
-                    "Google account not connected"
-                )
-                return@withContext Result.failure()
-            }
-
-            val credential = GoogleAccountCredential.usingOAuth2(
-                applicationContext, Collections.singleton(CalendarScopes.CALENDAR)
-            ).apply {
-                selectedAccount = account
-            }
-
-            val service = Calendar.Builder(
-                NetHttpTransport(),
-                GsonFactory.getDefaultInstance(),
-                credential
-            ).setApplicationName("Plan My Plate").build()
-
             if (isDeletion) {
-                val calendarEventId = inputData.getString("calendarEventId")
                 if (calendarEventId != null) {
-                    service.events().delete("primary", calendarEventId).execute()
+                    calendarRepository.deleteEvent(calendarEventId)
                 }
                 return@withContext Result.success()
             }
@@ -68,24 +38,18 @@ class CalendarSyncWorker(
             val mealWithDishes = database.mealDao().getMealWithDishes(sessionId) ?: return@withContext Result.failure()
             val existingEventId = database.mealDao().getCalendarEventId(sessionId)
 
-            val event = Event().apply {
-                summary = "Meal: " + mealWithDishes.dishes.joinToString(", ") { it.dishName }
-                description = mealWithDishes.session.notes ?: ""
-                start = EventDateTime().apply {
-                    dateTime = com.google.api.client.util.DateTime(mealWithDishes.session.scheduledTimestamp)
-                }
-                end = EventDateTime().apply {
-                    dateTime = com.google.api.client.util.DateTime(mealWithDishes.session.scheduledTimestamp + 3600000) // 1 hour
-                }
-            }
-
+            var message = ""
             if (existingEventId != null) {
-                service.events().update("primary", existingEventId, event).execute()
+                calendarRepository.updateEvent(existingEventId, mealWithDishes.session, mealWithDishes.dishes.map { it.dishName })
+                message = "Updated meal in calendar with ID $existingEventId"
             } else {
-                val createdEvent = service.events().insert("primary", event).execute()
-                database.mealDao().insertCalendarMapping(
-                    com.planmyplate.model.MealCalendarMapping(sessionId, createdEvent.id)
-                )
+                val createdEventId = calendarRepository.createEvent(mealWithDishes.session, mealWithDishes.dishes.map { it.dishName })
+                if (createdEventId != null) {
+                    database.mealDao().insertCalendarMapping(
+                        com.planmyplate.model.MealCalendarMapping(sessionId, createdEventId)
+                    )
+                }
+                message = "Created meal in calendar with ID $createdEventId"
             }
 
             syncLogRepository.log(
@@ -93,7 +57,7 @@ class CalendarSyncWorker(
                 "Sync Meal",
                 SyncLog.STATUS_SUCCESS,
                 SyncLog.SOURCE_QUEUE,
-                "Synced meal to calendar",
+                message,
                 sessionId
             )
             Result.success()
