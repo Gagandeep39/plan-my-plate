@@ -21,10 +21,13 @@ interface MealDao {
     @Query("SELECT * FROM meal_sessions WHERE sessionId = :sessionId")
     suspend fun getMealWithDishes(sessionId: Long): MealWithDishes?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert
     suspend fun insertSession(session: MealSession): Long
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Update
+    suspend fun updateSession(session: MealSession)
+
+    @Insert
     suspend fun insertDishes(dishes: List<Dish>)
 
     @Delete
