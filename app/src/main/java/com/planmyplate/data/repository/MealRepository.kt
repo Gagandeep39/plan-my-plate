@@ -46,7 +46,12 @@ class MealRepository(
     fun getAllMeals(): Flow<List<MealWithDishes>> = mealDao.getAllMeals()
 
     suspend fun saveMeal(session: MealSession, dishes: List<String>): Long {
-        val sessionId = mealDao.insertSession(session)
+        var sessionId = session.sessionId
+        if (sessionId == 0L) {
+            sessionId = mealDao.insertSession(session)
+        } else {
+            mealDao.updateSession(session)
+        }
 
         // Replace existing dishes for this session
         mealDao.deleteDishesForSession(sessionId)
