@@ -162,52 +162,54 @@ fun RecipeForm(recipeId: Long? = null, onBack: () -> Unit) {
             HorizontalDivider()
 
             // Ingredients Section
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Ingredients", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                TextButton(onClick = { viewModel.addIngredient() }) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Add Row")
-                }
-            }
-
-            if (uiState.ingredients.isEmpty()) {
-                Text(
-                    "No ingredients added yet.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-
-            uiState.ingredients.forEachIndexed { index, ingredient ->
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedTextField(
-                        value = ingredient.name,
-                        onValueChange = { viewModel.updateIngredient(index, it, ingredient.amount) },
-                        label = { Text("Item *") },
-                        isError = uiState.showErrors && ingredient.name.isBlank(),
-                        modifier = Modifier.weight(1.5f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = fieldColors
+                    Text("Ingredients", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { viewModel.addIngredient() }) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Add Row")
+                    }
+                }
+
+                if (uiState.ingredients.isEmpty()) {
+                    Text(
+                        "No ingredients added yet.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp)
                     )
-                    OutlinedTextField(
-                        value = ingredient.amount,
-                        onValueChange = { viewModel.updateIngredient(index, ingredient.name, it) },
-                        label = { Text("Amount") },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = fieldColors
-                    )
-                    IconButton(onClick = { viewModel.removeIngredient(index) }) {
-                        Icon(Icons.Default.RemoveCircleOutline, contentDescription = "Remove", tint = MaterialTheme.colorScheme.outline)
+                }
+
+                uiState.ingredients.forEachIndexed { index, ingredient ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = ingredient.name,
+                            onValueChange = { viewModel.updateIngredient(index, it, ingredient.amount) },
+                            label = { Text("Item *") },
+                            isError = uiState.showErrors && ingredient.name.isBlank(),
+                            modifier = Modifier.weight(1.5f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = fieldColors
+                        )
+                        OutlinedTextField(
+                            value = ingredient.amount,
+                            onValueChange = { viewModel.updateIngredient(index, ingredient.name, it) },
+                            label = { Text("Amount") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = fieldColors
+                        )
+                        IconButton(onClick = { viewModel.removeIngredient(index) }) {
+                            Icon(Icons.Default.RemoveCircleOutline, contentDescription = "Remove", tint = MaterialTheme.colorScheme.outline)
+                        }
                     }
                 }
             }
