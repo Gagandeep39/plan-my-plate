@@ -6,9 +6,10 @@ import com.planmyplate.data.AppDatabase
 import com.planmyplate.data.MealDao
 import com.planmyplate.data.worker.CalendarSyncWorker
 import com.planmyplate.data.worker.DriveExportWorker
-import com.planmyplate.model.Dish
 import com.planmyplate.model.MealSession
-import com.planmyplate.model.MealWithDishes
+import com.planmyplate.model.Recipe
+import com.planmyplate.model.SessionRecipe
+import com.planmyplate.model.SessionWithRecipes
 import kotlinx.coroutines.flow.Flow
 
 class MealRepository(
@@ -43,23 +44,22 @@ class MealRepository(
             .apply()
     }
 
-    fun getAllMeals(): Flow<List<MealWithDishes>> = mealDao.getAllMeals()
+    fun getAllMeals(): Flow<List<SessionWithRecipes>> = mealDao.getAllMeals()
 
-    suspend fun saveMeal(session: MealSession, dishes: List<String>): Long {
-        var sessionId = session.sessionId
-        if (sessionId == 0L) {
-            sessionId = mealDao.insertSession(session)
-        } else {
-            mealDao.updateSession(session)
-        }
+    suspend fun saveMeal(session: MealSession, recipes: List<Recipe>): Long {
+        val sessionId = mealDao.upsertSession(session)
 
-        // Replace existing dishes for this session
-        mealDao.deleteDishesForSession(sessionId)
-        val dishesToInsert = dishes.map { dishName ->
-            Dish(parentSessionId = sessionId, dishName = dishName)
+        // Replace existing recipes for this session
+        mealDao.deleteRecipesForSession(sessionId)
+        val sessionRecipesToInsert = recipes.map { recipe ->
+            SessionRecipe(
+                sessionId = sessionId,
+                recipeId = recipe.recipeId,
+                recipeNameSnapshot = recipe.name
+            )
         }
-        if (dishesToInsert.isNotEmpty()) {
-            mealDao.insertDishes(dishesToInsert)
+        if (sessionRecipesToInsert.isNotEmpty()) {
+            mealDao.insertSessionRecipes(sessionRecipesToInsert)
         }
 
         if (isCalendarAuthorized()) {
@@ -98,7 +98,7 @@ class MealRepository(
             )
         }
         
-        mealDao.deleteDishesForSession(session.sessionId)
+        mealDao.deleteRecipesForSession(session.sessionId)
         mealDao.deleteCalendarMapping(session.sessionId)
         mealDao.deleteSession(session)
         markLocalWrite()

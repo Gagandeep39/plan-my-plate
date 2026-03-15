@@ -7,7 +7,7 @@ import com.planmyplate.data.repository.MealRepository
 import com.planmyplate.model.DayPlan
 import com.planmyplate.model.Meal
 import com.planmyplate.model.MealType
-import com.planmyplate.model.MealWithDishes
+import com.planmyplate.model.SessionWithRecipes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -20,7 +20,7 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
     private val _selectedMealIds = MutableStateFlow<Set<String>>(emptySet())
     val selectedMealIds: StateFlow<Set<String>> = _selectedMealIds.asStateFlow()
 
-    private val _allMealsWithDishes = MutableStateFlow<List<MealWithDishes>?>(null)
+    private val _allSessionsWithRecipes = MutableStateFlow<List<SessionWithRecipes>?>(null)
 
     private val dateFormat = SimpleDateFormat("EEEE, MMMM dd", Locale.getDefault())
     private val isoFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
@@ -28,16 +28,16 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
     init {
         viewModelScope.launch {
             repository.getAllMeals().collect {
-                _allMealsWithDishes.value = it
+                _allSessionsWithRecipes.value = it
             }
         }
     }
 
-    val timelineState: StateFlow<List<DayPlan>> = _allMealsWithDishes
+    val timelineState: StateFlow<List<DayPlan>> = _allSessionsWithRecipes
         .filterNotNull()
-        .map { mealsWithDishes ->
+        .map { sessionsWithRecipes ->
             withContext(Dispatchers.Default) {
-                generateTimeline(mealsWithDishes)
+                generateTimeline(sessionsWithRecipes)
             }
         }
         .stateIn(
@@ -59,23 +59,23 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
     fun deleteSelectedMeals() {
         viewModelScope.launch {
             val idsToDelete = _selectedMealIds.value
-            val mealsToDelete = (_allMealsWithDishes.value ?: emptyList()).filter { it.session.sessionId.toString() in idsToDelete }
+            val sessionsToDelete = (_allSessionsWithRecipes.value ?: emptyList()).filter { it.session.sessionId.toString() in idsToDelete }
             
-            mealsToDelete.forEach { 
+            sessionsToDelete.forEach { 
                 repository.deleteMeal(it.session)
             }
             clearSelection()
         }
     }
 
-    private fun generateTimeline(mealsWithDishes: List<MealWithDishes>): List<DayPlan> {
+    private fun generateTimeline(sessionsWithRecipes: List<SessionWithRecipes>): List<DayPlan> {
         val todayCalendar = Calendar.getInstance()
         val todayDateStr = dateFormat.format(todayCalendar.time)
         
         val yesterdayCalendar = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
         val yesterdayDateStr = dateFormat.format(yesterdayCalendar.time)
 
-        val dataByDate = mealsWithDishes.groupBy { 
+        val dataByDate = sessionsWithRecipes.groupBy { 
             val cal = Calendar.getInstance().apply { timeInMillis = it.session.scheduledTimestamp }
             isoFormat.format(cal.time)
         }
@@ -89,7 +89,7 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
             val currentIsoDate = isoFormat.format(time)
             val currentDateStr = dateFormat.format(time)
             
-            val mealsForDate = dataByDate[currentIsoDate] ?: emptyList()
+            val sessionsForDate = dataByDate[currentIsoDate] ?: emptyList()
             
             val title = when (currentDateStr) {
                 todayDateStr -> "Today's Plan"
@@ -100,14 +100,14 @@ class TimelineViewModel(private val repository: MealRepository) : ViewModel() {
             fullTimeline.add(
                 DayPlan(
                     headerTitle = title,
-                    meals = mealsForDate.map { mwd ->
-                        val cal = Calendar.getInstance().apply { timeInMillis = mwd.session.scheduledTimestamp }
+                    meals = sessionsForDate.map { swr ->
+                        val cal = Calendar.getInstance().apply { timeInMillis = swr.session.scheduledTimestamp }
                         Meal(
-                            id = mwd.session.sessionId.toString(),
-                            name = mwd.dishes.joinToString(", ") { it.dishName }.ifEmpty { "No dishes added" },
+                            id = swr.session.sessionId.toString(),
+                            name = swr.recipes.joinToString(", ") { it.recipeNameSnapshot }.ifEmpty { "No recipes added" },
                             hour = cal.get(Calendar.HOUR_OF_DAY),
                             minute = cal.get(Calendar.MINUTE),
-                            type = try { MealType.valueOf(mwd.session.mealType) } catch (e: Exception) { MealType.LUNCH }
+                            type = try { MealType.valueOf(swr.session.mealType) } catch (e: Exception) { MealType.LUNCH }
                         )
                     }.sortedBy { it.hour * 60 + it.minute },
                     isToday = currentDateStr == todayDateStr,

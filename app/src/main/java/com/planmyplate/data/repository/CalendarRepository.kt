@@ -35,13 +35,12 @@ class CalendarRepository(private val context: Context) {
         ).setApplicationName("Plan My Plate").build()
     }
 
-    private fun prepareEvent(mealSession: MealSession, dishNames: List<String>): Event {
+    private fun prepareEvent(mealSession: MealSession, recipeNames: List<String>): Event {
         return Event().apply {
-            summary = "${mealSession.mealType.lowercase().replaceFirstChar { it.uppercase() }}: ${dishNames.joinToString(", ")}"
+            summary = "${mealSession.mealType.lowercase().replaceFirstChar { it.uppercase() }}: ${recipeNames.joinToString(", ")}"
             colorId = "3" // Grape (Purple)
             
             description = buildString {
-                // Ensure the description starts immediately on the first line with notes (if any)
                 val notes = mealSession.notes
                 if (!notes.isNullOrBlank()) {
                     append(notes)
@@ -81,15 +80,15 @@ class CalendarRepository(private val context: Context) {
         events.items?.firstOrNull()?.id
     }
 
-    suspend fun createEvent(mealSession: MealSession, dishNames: List<String>): String? = runCalendarTask { service ->
-        val event = prepareEvent(mealSession, dishNames)
+    suspend fun createEvent(mealSession: MealSession, recipeNames: List<String>): String? = runCalendarTask { service ->
+        val event = prepareEvent(mealSession, recipeNames)
         service.events().insert("primary", event).execute().id
     }
 
-    suspend fun updateEvent(calendarEventId: String, mealSession: MealSession, dishNames: List<String>) {
+    suspend fun updateEvent(calendarEventId: String, mealSession: MealSession, recipeNames: List<String>) {
         runCalendarTask { service ->
             val event = service.events().get("primary", calendarEventId).execute()
-            val updatedData = prepareEvent(mealSession, dishNames)
+            val updatedData = prepareEvent(mealSession, recipeNames)
             
             event.summary = updatedData.summary
             event.description = updatedData.description

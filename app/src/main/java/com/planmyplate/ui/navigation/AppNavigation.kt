@@ -58,7 +58,7 @@ fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
             ),
             exitTransition = {
                 // Disable animation when moving to main to avoid the "sliding out" effect under the splash screen
-                if (targetState.destination.route == "main") {
+                if (targetState.destination.route?.contains("main") == true) {
                     ExitTransition.None
                 } else {
                     NavTransitions.exitTransition(this)

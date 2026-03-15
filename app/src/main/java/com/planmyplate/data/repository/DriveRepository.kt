@@ -12,7 +12,7 @@ import com.google.api.services.drive.model.Permission
 import com.planmyplate.data.AppDatabase
 import com.planmyplate.util.AuthAccountResolver
 import java.io.FileOutputStream
-import com.planmyplate.model.MealWithDishes
+import com.planmyplate.model.SessionWithRecipes
 import com.planmyplate.model.SyncLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -74,9 +74,6 @@ class DriveRepository(private val context: Context) {
         }
     }
 
-    /**
-     * Gets the ID of the app's dedicated folder, creating it if it doesn't exist.
-     */
     private fun getOrCreateFolderId(service: Drive): String? {
         return try {
             val query = "name = '$FOLDER_NAME' and mimeType = '$FOLDER_MIME_TYPE' and trashed = false"
@@ -127,7 +124,6 @@ class DriveRepository(private val context: Context) {
             }
             service.permissions().create(fileId, permission).execute()
         } catch (_: Exception) {
-            // Ignore if permission already exists or Drive rejects duplicate permission creation.
         }
     }
 
@@ -145,21 +141,21 @@ class DriveRepository(private val context: Context) {
         return SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(timestamp))
     }
 
-    private fun buildMealsJson(meals: List<MealWithDishes>): String {
+    private fun buildMealsJson(meals: List<SessionWithRecipes>): String {
         val jsonArray = JSONArray()
         meals.forEach { meal ->
-            val dishNames = meal.dishes.map { it.dishName.trim() }.filter { it.isNotBlank() }
-            val dishArray = JSONArray()
-            dishNames.forEach { dishArray.put(it) }
+            val recipeNames = meal.recipes.map { it.recipeNameSnapshot.trim() }.filter { it.isNotBlank() }
+            val recipeArray = JSONArray()
+            recipeNames.forEach { recipeArray.put(it) }
 
             val jsonObject = JSONObject().apply {
                 put("sessionId", meal.session.sessionId)
                 put("mealType", meal.session.mealType)
-                put("mealName", dishNames.joinToString(", "))
+                put("mealName", recipeNames.joinToString(", "))
                 put("mealTime", formatIsoUtc(meal.session.scheduledTimestamp))
                 put("scheduledDate", formatLocalDate(meal.session.scheduledTimestamp))
                 put("displayTime", formatLocalTime(meal.session.scheduledTimestamp))
-                put("dishNames", dishArray)
+                put("recipeNames", recipeArray)
                 put("notes", meal.session.notes ?: JSONObject.NULL)
             }
             jsonArray.put(jsonObject)
@@ -213,7 +209,7 @@ class DriveRepository(private val context: Context) {
     }
 
     suspend fun replaceSharableJsonFileContent(
-        meals: List<MealWithDishes>,
+        meals: List<SessionWithRecipes>,
         source: String = SyncLog.SOURCE_QUEUE
     ): String? = withContext(Dispatchers.IO) {
         val service = getDriveService()
@@ -261,10 +257,6 @@ class DriveRepository(private val context: Context) {
 
     data class CloudBackupInfo(val fileId: String, val modifiedTimeMs: Long, val sizeBytes: Long)
 
-    /**
-     * Fetches the Drive backup file's id, modifiedTime, and size without downloading content.
-     * Returns null if no backup file exists or Drive is unavailable.
-     */
     suspend fun getCloudBackupInfo(): CloudBackupInfo? = withContext(Dispatchers.IO) {
         val service = getDriveService() ?: return@withContext null
         try {
@@ -285,10 +277,6 @@ class DriveRepository(private val context: Context) {
         }
     }
 
-    /**
-     * Downloads the Drive backup file to [targetFile].
-     * Returns true on success.
-     */
     suspend fun downloadDatabaseBackup(targetFile: java.io.File, source: String = SyncLog.SOURCE_DIRECT): Boolean = withContext(Dispatchers.IO) {
         val service = getDriveService()
         if (service == null) {
@@ -335,10 +323,6 @@ class DriveRepository(private val context: Context) {
         }
     }
 
-    /**
-     * Uploads the pre-copied SQLite DB file (from cache) to Google Drive.
-     * The worker is responsible for WAL checkpoint + file copy before calling this.
-     */
     suspend fun uploadDatabaseBackup(source: String = SyncLog.SOURCE_QUEUE): Boolean = withContext(Dispatchers.IO) {
         val service = getDriveService()
         if (service == null) {
