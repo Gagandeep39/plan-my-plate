@@ -1,6 +1,7 @@
 package com.planmyplate.data.repository
 
 import android.content.Context
+import android.util.Log
 import androidx.work.*
 import com.planmyplate.data.AppDatabase
 import com.planmyplate.data.MealDao
@@ -46,14 +47,14 @@ class MealRepository(
     fun getAllMeals(): Flow<List<SessionWithRecipes>> = mealDao.getAllMeals()
 
     suspend fun saveMeal(session: MealSession, sessionRecipes: List<SessionRecipe>): Long {
-        val sessionId = mealDao.upsertSession(session)
-
+        val upsertedId = mealDao.upsertSession(session)
+            // If upsertedId == -1, it was an update, so use the original session.sessionId
+        val sessionId = if (upsertedId == -1L) session.sessionId else upsertedId
         // Replace existing recipes for this session
         mealDao.deleteRecipesForSession(sessionId)
         
         // Ensure the sessionId is correctly set for all linked recipes
         val toInsert = sessionRecipes.map { it.copy(sessionId = sessionId) }
-        
         if (toInsert.isNotEmpty()) {
             mealDao.insertSessionRecipes(toInsert)
         }
