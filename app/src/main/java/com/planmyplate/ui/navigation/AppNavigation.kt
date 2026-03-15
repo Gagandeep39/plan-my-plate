@@ -1,5 +1,9 @@
 package com.planmyplate.ui.navigation
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
@@ -22,6 +26,7 @@ import com.planmyplate.ui.sync.SyncCheckViewModelFactory
 @Composable
 fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
     val navController = rememberNavController()
+    val context = LocalContext.current
 
     NavHost(
         navController = navController,
@@ -31,9 +36,9 @@ fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
         popEnterTransition = { NavTransitions.popEnterTransition(this) },
         popExitTransition = { NavTransitions.popExitTransition(this) }
     ) {
-        composable(route = Screen.Main.route,
+        composable(
+            route = Screen.Main.route,
             enterTransition = {
-                // Disable animation when coming from the initial splash/sync check for a seamless transition
                 if (initialState.destination.route?.contains("sync_check") == true) {
                     EnterTransition.None
                 } else {
@@ -59,7 +64,6 @@ fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
                 }
             ),
             exitTransition = {
-                // Disable animation when moving to main to avoid the "sliding out" effect under the splash screen
                 if (targetState.destination.route?.contains("main") == true) {
                     ExitTransition.None
                 } else {
@@ -68,12 +72,11 @@ fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
             }
         ) { backStackEntry ->
             val fromSettings = backStackEntry.arguments?.getBoolean("fromSettings") ?: false
-            val activity = (LocalContext.current as? android.app.Activity)
-
+            
             val vm = if (fromSettings) {
-                val app = LocalContext.current.applicationContext as PlanMyPlateApp
+                val app = context.applicationContext as PlanMyPlateApp
                 androidx.lifecycle.viewmodel.compose.viewModel(
-                    factory = SyncCheckViewModelFactory(LocalContext.current, app.driveRepository, app.userRepository, true)
+                    factory = SyncCheckViewModelFactory(context, app.driveRepository, app.userRepository, true)
                 )
             } else {
                 syncCheckViewModel
@@ -91,9 +94,12 @@ fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
                     }
                 },
                 onRestoreComplete = {
-                    activity?.recreate()
-                    navController.navigate(Screen.Main.route) {
-                        popUpTo(Screen.SyncCheck.route) { inclusive = true }
+                    // Full Activity Restart is still required to swap the DB file safely
+                    context.findActivity()?.let { activity ->
+                        val intent = activity.intent
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                        activity.startActivity(intent)
+                        activity.finish()
                     }
                 }
             )
@@ -104,7 +110,10 @@ fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
                 onBack = { navController.popBackStack() },
                 onOpenSyncHistory = { navController.navigate(Screen.SyncHistory.route) },
                 onNavigateToSyncCheck = {
-                    navController.navigate(Screen.SyncCheck.createRoute(true))
+                    // Navigate to SyncCheck and CLEAR everything else to prevent DB access crashes
+                    navController.navigate(Screen.SyncCheck.createRoute(true)) {
+                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                    }
                 }
             )
         }
@@ -126,9 +135,7 @@ fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
             val sessionId = backStackEntry.arguments?.getString("sessionId")?.toLongOrNull()
             MealForm(
                 sessionId = sessionId,
-                onBack = {
-                    navController.popBackStack()
-                }
+                onBack = { navController.popBackStack() }
             )
         }
 
@@ -145,10 +152,17 @@ fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
             val recipeId = backStackEntry.arguments?.getString("recipeId")?.toLongOrNull()
             RecipeForm(
                 recipeId = recipeId,
-                onBack = {
-                    navController.popBackStack()
-                }
+                onBack = { navController.popBackStack() }
             )
         }
     }
+}
+
+private fun Context.findActivity(): Activity? {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is Activity) return context
+        context = context.baseContext
+    }
+    return null
 }
