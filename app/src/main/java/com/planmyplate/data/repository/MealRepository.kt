@@ -1,14 +1,15 @@
 package com.planmyplate.data.repository
 
 import android.content.Context
+import android.util.Log
 import androidx.work.*
 import com.planmyplate.data.AppDatabase
 import com.planmyplate.data.MealDao
 import com.planmyplate.data.worker.CalendarSyncWorker
 import com.planmyplate.data.worker.DriveExportWorker
-import com.planmyplate.model.Dish
 import com.planmyplate.model.MealSession
-import com.planmyplate.model.MealWithDishes
+import com.planmyplate.model.SessionRecipe
+import com.planmyplate.model.SessionWithRecipes
 import kotlinx.coroutines.flow.Flow
 
 class MealRepository(
@@ -43,23 +44,19 @@ class MealRepository(
             .apply()
     }
 
-    fun getAllMeals(): Flow<List<MealWithDishes>> = mealDao.getAllMeals()
+    fun getAllMeals(): Flow<List<SessionWithRecipes>> = mealDao.getAllMeals()
 
-    suspend fun saveMeal(session: MealSession, dishes: List<String>): Long {
-        var sessionId = session.sessionId
-        if (sessionId == 0L) {
-            sessionId = mealDao.insertSession(session)
-        } else {
-            mealDao.updateSession(session)
-        }
-
-        // Replace existing dishes for this session
-        mealDao.deleteDishesForSession(sessionId)
-        val dishesToInsert = dishes.map { dishName ->
-            Dish(parentSessionId = sessionId, dishName = dishName)
-        }
-        if (dishesToInsert.isNotEmpty()) {
-            mealDao.insertDishes(dishesToInsert)
+    suspend fun saveMeal(session: MealSession, sessionRecipes: List<SessionRecipe>): Long {
+        val upsertedId = mealDao.upsertSession(session)
+            // If upsertedId == -1, it was an update, so use the original session.sessionId
+        val sessionId = if (upsertedId == -1L) session.sessionId else upsertedId
+        // Replace existing recipes for this session
+        mealDao.deleteRecipesForSession(sessionId)
+        
+        // Ensure the sessionId is correctly set for all linked recipes
+        val toInsert = sessionRecipes.map { it.copy(sessionId = sessionId) }
+        if (toInsert.isNotEmpty()) {
+            mealDao.insertSessionRecipes(toInsert)
         }
 
         if (isCalendarAuthorized()) {
@@ -75,7 +72,6 @@ class MealRepository(
     suspend fun deleteMeal(session: MealSession) {
         val eventId = mealDao.getCalendarEventId(session.sessionId)
         
-        // Schedule deletion in calendar
         if (eventId != null && isCalendarAuthorized()) {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -98,7 +94,7 @@ class MealRepository(
             )
         }
         
-        mealDao.deleteDishesForSession(session.sessionId)
+        mealDao.deleteRecipesForSession(session.sessionId)
         mealDao.deleteCalendarMapping(session.sessionId)
         mealDao.deleteSession(session)
         markLocalWrite()

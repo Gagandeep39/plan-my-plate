@@ -4,13 +4,12 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.planmyplate.data.AppDatabase
-import com.planmyplate.data.repository.DriveRepository
 import com.planmyplate.data.repository.SyncLogRepository
 import com.planmyplate.model.SyncLog
 import com.planmyplate.data.repository.CalendarRepository
+import com.planmyplate.model.MealCalendarMapping
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.util.Collections
 
 class CalendarSyncWorker(
     appContext: Context,
@@ -35,18 +34,19 @@ class CalendarSyncWorker(
                 return@withContext Result.success()
             }
 
-            val mealWithDishes = database.mealDao().getMealWithDishes(sessionId) ?: return@withContext Result.failure()
+            val sessionWithRecipes = database.mealDao().getMealWithRecipes(sessionId) ?: return@withContext Result.failure()
             val existingEventId = database.mealDao().getCalendarEventId(sessionId)
+            val recipeNames = sessionWithRecipes.recipes.map { it.recipeNameSnapshot }
 
             var message = ""
             if (existingEventId != null) {
-                calendarRepository.updateEvent(existingEventId, mealWithDishes.session, mealWithDishes.dishes.map { it.dishName })
+                calendarRepository.updateEvent(existingEventId, sessionWithRecipes.session, recipeNames)
                 message = "Updated meal in calendar"
             } else {
-                val createdEventId = calendarRepository.createEvent(mealWithDishes.session, mealWithDishes.dishes.map { it.dishName })
+                val createdEventId = calendarRepository.createEvent(sessionWithRecipes.session, recipeNames)
                 if (createdEventId != null) {
-                    database.mealDao().insertCalendarMapping(
-                        com.planmyplate.model.MealCalendarMapping(sessionId, createdEventId)
+                    database.mealDao().upsertCalendarMapping(
+                        MealCalendarMapping(sessionId, createdEventId)
                     )
                 }
                 message = "Created meal in calendar"

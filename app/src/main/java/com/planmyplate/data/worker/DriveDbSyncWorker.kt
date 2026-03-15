@@ -145,8 +145,7 @@ class DriveDbSyncWorker(
 
             if (!backupReady) throw Exception("Failed to create backup file")
 
-            val mealCount = database.mealDao().getMealCount()
-            if (mealCount == 0) {
+            if (database.isDatabaseEmpty()) {
                  syncLogRepo.log(
                     service = SyncLog.SERVICE_DRIVE,
                     action = "Backup database",

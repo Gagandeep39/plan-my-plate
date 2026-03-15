@@ -4,8 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.planmyplate.data.repository.MealRepository
+import com.planmyplate.data.repository.RecipeRepository
 import com.planmyplate.model.MealSession
 import com.planmyplate.model.MealType
+import com.planmyplate.model.Recipe
+import com.planmyplate.model.SessionRecipe
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,16 +22,18 @@ data class MealFormUiState(
     val mealType: MealType = MealType.BREAKFAST,
     val hour: Int = 9,
     val minute: Int = 0,
-    val dishes: List<String> = emptyList(),
-    val currentDishName: String = "",
+    val selectedRecipes: List<SessionRecipe> = emptyList(), // Now using SessionRecipe directly
+    val recipeSearchQuery: String = "",
+    val searchResults: List<Recipe> = emptyList(),
     val notes: String = "",
     val isSaved: Boolean = false,
     val isDeleted: Boolean = false,
-    val mealSession: MealSession? = null 
+    val mealSession: MealSession? = null
 )
 
 class MealFormViewModel(
-    private val repository: MealRepository,
+    private val mealRepository: MealRepository,
+    private val recipeRepository: RecipeRepository,
     private val initialSessionId: Long?
 ) : ViewModel() {
 
@@ -43,19 +48,20 @@ class MealFormViewModel(
 
     private fun loadMeal(id: Long) {
         viewModelScope.launch {
-            repository.getAllMeals().collect { allMeals ->
-                val mwd = allMeals.find { it.session.sessionId == id }
-                mwd?.let { mealWithDishes ->
-                    val cal = Calendar.getInstance().apply { timeInMillis = mealWithDishes.session.scheduledTimestamp }
+            mealRepository.getAllMeals().collect { allMeals ->
+                val swr = allMeals.find { it.session.sessionId == id }
+                swr?.let { sessionWithRecipes ->
+                    val cal = Calendar.getInstance().apply { timeInMillis = sessionWithRecipes.session.scheduledTimestamp }
+                    
                     _uiState.update { 
                         it.copy(
                             date = cal,
-                            mealType = try { MealType.valueOf(mealWithDishes.session.mealType) } catch (e: Exception) { MealType.LUNCH },
+                            mealType = try { MealType.valueOf(sessionWithRecipes.session.mealType) } catch (e: Exception) { MealType.LUNCH },
                             hour = cal.get(Calendar.HOUR_OF_DAY),
                             minute = cal.get(Calendar.MINUTE),
-                            dishes = mealWithDishes.dishes.map { d -> d.dishName },
-                            notes = mealWithDishes.session.notes ?: "",
-                            mealSession = mealWithDishes.session
+                            selectedRecipes = sessionWithRecipes.recipes, // No mapping needed!
+                            notes = sessionWithRecipes.session.notes ?: "",
+                            mealSession = sessionWithRecipes.session
                         )
                     }
                 }
@@ -81,24 +87,43 @@ class MealFormViewModel(
         _uiState.update { it.copy(hour = hour, minute = minute) }
     }
 
-    fun onDishNameChanged(name: String) {
-        _uiState.update { it.copy(currentDishName = name) }
+    fun onRecipeSearchQueryChanged(query: String) {
+        _uiState.update { it.copy(recipeSearchQuery = query) }
+        viewModelScope.launch {
+            if (query.isBlank()) {
+                _uiState.update { it.copy(searchResults = emptyList()) }
+            } else {
+                val results = recipeRepository.searchRecipes(query)
+                _uiState.update { it.copy(searchResults = results) }
+            }
+        }
     }
 
-    fun addDish() {
-        if (_uiState.value.currentDishName.isNotBlank()) {
+    fun selectRecipe(recipe: Recipe) {
+        // Only add if not already selected (check recipeId for existing links)
+        val isAlreadySelected = _uiState.value.selectedRecipes.any { 
+            it.recipeId != null && it.recipeId == recipe.recipeId 
+        }
+
+        if (!isAlreadySelected) {
+            val snapshot = SessionRecipe(
+                sessionId = _uiState.value.sessionId ?: 0,
+                recipeId = recipe.recipeId,
+                recipeNameSnapshot = recipe.name
+            )
             _uiState.update {
                 it.copy(
-                    dishes = it.dishes + it.currentDishName.trim(),
-                    currentDishName = ""
+                    selectedRecipes = it.selectedRecipes + snapshot,
+                    recipeSearchQuery = "",
+                    searchResults = emptyList()
                 )
             }
         }
     }
 
-    fun removeDish(dishName: String) {
+    fun removeRecipe(sessionRecipe: SessionRecipe) {
         _uiState.update {
-            it.copy(dishes = it.dishes - dishName)
+            it.copy(selectedRecipes = it.selectedRecipes - sessionRecipe)
         }
     }
 
@@ -109,13 +134,7 @@ class MealFormViewModel(
     fun saveMeal() {
         viewModelScope.launch {
             val currentState = _uiState.value
-            val finalDishes = if (currentState.currentDishName.isNotBlank()) {
-                currentState.dishes + currentState.currentDishName.trim()
-            } else {
-                currentState.dishes
-            }
-
-            if (finalDishes.isEmpty()) return@launch
+            if (currentState.selectedRecipes.isEmpty()) return@launch
 
             val calendar = currentState.date.clone() as Calendar
             calendar.set(Calendar.HOUR_OF_DAY, currentState.hour)
@@ -127,10 +146,12 @@ class MealFormViewModel(
                 sessionId = currentState.sessionId ?: 0,
                 scheduledTimestamp = calendar.timeInMillis,
                 mealType = currentState.mealType.name,
-                notes = currentState.notes.ifBlank { null }
+                notes = currentState.notes.ifBlank { null },
+                createdAt = currentState.mealSession?.createdAt ?: System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
             )
             
-            repository.saveMeal(session, finalDishes)
+            mealRepository.saveMeal(session, currentState.selectedRecipes)
             _uiState.update { it.copy(isSaved = true) }
         }
     }
@@ -139,7 +160,7 @@ class MealFormViewModel(
         viewModelScope.launch {
             val session = _uiState.value.mealSession
             if (session != null) {
-                repository.deleteMeal(session)
+                mealRepository.deleteMeal(session)
                 _uiState.update { it.copy(isDeleted = true) }
             }
         }
@@ -147,13 +168,14 @@ class MealFormViewModel(
 }
 
 class MealFormViewModelFactory(
-    private val repository: MealRepository,
+    private val mealRepository: MealRepository,
+    private val recipeRepository: RecipeRepository,
     private val sessionId: Long?
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MealFormViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return MealFormViewModel(repository, sessionId) as T
+            return MealFormViewModel(mealRepository, recipeRepository, sessionId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
