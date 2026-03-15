@@ -223,9 +223,9 @@ fun SettingsScreen(
                 onOpenSyncHistory = onOpenSyncHistory
             )
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             Text(
-                "App Version: 1.0.0",
+                "App Version: 2.0.0",
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -397,7 +397,7 @@ fun DriveCard(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = uiState.sharableLink!!,
+                                    text = uiState.sharableLink,
                                     style = MaterialTheme.typography.bodySmall,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
