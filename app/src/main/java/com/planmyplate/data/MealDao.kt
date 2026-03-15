@@ -24,7 +24,7 @@ interface MealDao {
     @Upsert
     suspend fun upsertSession(session: MealSession): Long
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSessionRecipes(recipes: List<SessionRecipe>)
 
     @Delete
