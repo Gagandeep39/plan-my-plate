@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
 
     private val syncCheckViewModel: SyncCheckViewModel by viewModels {
         val app = application as PlanMyPlateApp
-        SyncCheckViewModelFactory(this, app.driveRepository, app.userRepository, false)
+        SyncCheckViewModelFactory(this, app.driveRepository, app.userRepository, app.syncLogRepository, false)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

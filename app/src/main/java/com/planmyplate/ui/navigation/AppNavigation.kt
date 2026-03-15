@@ -76,7 +76,7 @@ fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
             val vm = if (fromSettings) {
                 val app = context.applicationContext as PlanMyPlateApp
                 androidx.lifecycle.viewmodel.compose.viewModel(
-                    factory = SyncCheckViewModelFactory(context, app.driveRepository, app.userRepository, true)
+                    factory = SyncCheckViewModelFactory(context, app.driveRepository, app.userRepository, app.syncLogRepository, true)
                 )
             } else {
                 syncCheckViewModel
