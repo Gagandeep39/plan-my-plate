@@ -12,7 +12,7 @@ import androidx.room.Relation
 data class MealSession(
     @PrimaryKey(autoGenerate = true)
     val sessionId: Long = 0,
-    val scheduledTimestamp: Long, // Saved as UTC Epoch milliseconds
+    val scheduledTimestamp: Long,
     val mealType: String,         // e.g., "BREAKFAST", "LUNCH"
     val isCompleted: Boolean = false,
     val notes: String? = null,
