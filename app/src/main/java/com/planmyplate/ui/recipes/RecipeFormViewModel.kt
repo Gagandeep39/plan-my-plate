@@ -26,9 +26,10 @@ data class RecipeFormUiState(
     val comments: String = "",
     val durationMinutes: String = "",
     val difficulty: String? = null,
-    val ingredients: List<IngredientDraft> = listOf(IngredientDraft()),
+    val ingredients: List<IngredientDraft> = emptyList(), // Start empty as requested
     val isSaved: Boolean = false,
     val isDeleted: Boolean = false,
+    val showErrors: Boolean = false,
     val existingRecipe: Recipe? = null
 )
 
@@ -57,17 +58,13 @@ class RecipeFormViewModel(
                         durationMinutes = rwi.recipe.durationMinutes?.toString() ?: "",
                         difficulty = rwi.recipe.difficulty,
                         existingRecipe = rwi.recipe,
-                        ingredients = if (rwi.ingredients.isEmpty()) {
-                            listOf(IngredientDraft())
-                        } else {
-                            rwi.ingredients.map { ing -> 
-                                IngredientDraft(
-                                    id = ing.ingredientId, 
-                                    name = ing.name, 
-                                    amount = ing.amount,
-                                    createdAt = ing.createdAt
-                                ) 
-                            }
+                        ingredients = rwi.ingredients.map { ing -> 
+                            IngredientDraft(
+                                id = ing.ingredientId, 
+                                name = ing.name, 
+                                amount = ing.amount,
+                                createdAt = ing.createdAt
+                            ) 
                         }
                     )
                 }
@@ -102,12 +99,7 @@ class RecipeFormViewModel(
     fun removeIngredient(index: Int) {
         _uiState.update {
             val newList = it.ingredients.toMutableList()
-            if (newList.size > 1) {
-                newList.removeAt(index)
-            } else {
-                // If it's the last one, just clear it instead of removing
-                newList[0] = IngredientDraft()
-            }
+            newList.removeAt(index)
             it.copy(ingredients = newList)
         }
     }
@@ -121,10 +113,16 @@ class RecipeFormViewModel(
     }
 
     fun saveRecipe() {
-        viewModelScope.launch {
-            val currentState = _uiState.value
-            if (currentState.name.isBlank()) return@launch
+        val currentState = _uiState.value
+        
+        // Validation
+        val hasInvalidIngredients = currentState.ingredients.any { it.name.isBlank() }
+        if (currentState.name.isBlank() || hasInvalidIngredients) {
+            _uiState.update { it.copy(showErrors = true) }
+            return
+        }
 
+        viewModelScope.launch {
             val recipe = Recipe(
                 recipeId = currentState.recipeId ?: 0,
                 name = currentState.name,
@@ -137,7 +135,6 @@ class RecipeFormViewModel(
             )
 
             val ingredients = currentState.ingredients
-                .filter { it.name.isNotBlank() }
                 .map {
                     Ingredient(
                         ingredientId = it.id,

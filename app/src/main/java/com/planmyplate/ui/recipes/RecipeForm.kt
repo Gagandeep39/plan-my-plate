@@ -96,6 +96,7 @@ fun RecipeForm(recipeId: Long? = null, onBack: () -> Unit) {
                 label = { Text("Recipe Name *") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
+                isError = uiState.showErrors && uiState.name.isBlank(),
                 colors = fieldColors,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
             )
@@ -147,6 +148,13 @@ fun RecipeForm(recipeId: Long? = null, onBack: () -> Unit) {
                                 }
                             )
                         }
+                        DropdownMenuItem(
+                            text = { Text("None") },
+                            onClick = {
+                                viewModel.onDifficultyChanged(null)
+                                expanded = false
+                            }
+                        )
                     }
                 }
             }
@@ -167,16 +175,25 @@ fun RecipeForm(recipeId: Long? = null, onBack: () -> Unit) {
                 }
             }
 
+            if (uiState.ingredients.isEmpty()) {
+                Text(
+                    "No ingredients added yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
             uiState.ingredients.forEachIndexed { index, ingredient ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedTextField(
                         value = ingredient.name,
                         onValueChange = { viewModel.updateIngredient(index, it, ingredient.amount) },
-                        label = { Text("Item") },
+                        label = { Text("Item *") },
+                        isError = uiState.showErrors && ingredient.name.isBlank(),
                         modifier = Modifier.weight(1.5f),
                         shape = RoundedCornerShape(12.dp),
                         colors = fieldColors
