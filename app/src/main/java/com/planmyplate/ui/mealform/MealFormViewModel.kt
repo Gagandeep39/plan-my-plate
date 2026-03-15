@@ -146,7 +146,9 @@ class MealFormViewModel(
                 sessionId = currentState.sessionId ?: 0,
                 scheduledTimestamp = calendar.timeInMillis,
                 mealType = currentState.mealType.name,
-                notes = currentState.notes.ifBlank { null }
+                notes = currentState.notes.ifBlank { null },
+                createdAt = currentState.mealSession?.createdAt ?: System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
             )
             
             mealRepository.saveMeal(session, currentState.selectedRecipes)

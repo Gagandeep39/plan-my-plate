@@ -15,7 +15,8 @@ import kotlinx.coroutines.launch
 data class IngredientDraft(
     val id: Long = 0,
     val name: String = "",
-    val amount: String = ""
+    val amount: String = "",
+    val createdAt: Long? = null
 )
 
 data class RecipeFormUiState(
@@ -25,7 +26,8 @@ data class RecipeFormUiState(
     val comments: String = "",
     val ingredients: List<IngredientDraft> = listOf(IngredientDraft()),
     val isSaved: Boolean = false,
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    val existingRecipe: Recipe? = null
 )
 
 class RecipeFormViewModel(
@@ -50,11 +52,17 @@ class RecipeFormViewModel(
                         name = rwi.recipe.name,
                         steps = rwi.recipe.steps,
                         comments = rwi.recipe.comments ?: "",
+                        existingRecipe = rwi.recipe,
                         ingredients = if (rwi.ingredients.isEmpty()) {
                             listOf(IngredientDraft())
                         } else {
                             rwi.ingredients.map { ing -> 
-                                IngredientDraft(id = ing.ingredientId, name = ing.name, amount = ing.amount) 
+                                IngredientDraft(
+                                    id = ing.ingredientId, 
+                                    name = ing.name, 
+                                    amount = ing.amount,
+                                    createdAt = ing.createdAt
+                                ) 
                             }
                         }
                     )
@@ -110,6 +118,7 @@ class RecipeFormViewModel(
                 name = currentState.name,
                 steps = currentState.steps,
                 comments = currentState.comments.ifBlank { null },
+                createdAt = currentState.existingRecipe?.createdAt ?: System.currentTimeMillis(),
                 updatedAt = System.currentTimeMillis()
             )
 
@@ -120,7 +129,9 @@ class RecipeFormViewModel(
                         ingredientId = it.id,
                         parentRecipeId = currentState.recipeId ?: 0,
                         name = it.name,
-                        amount = it.amount
+                        amount = it.amount,
+                        createdAt = it.createdAt ?: System.currentTimeMillis(),
+                        updatedAt = System.currentTimeMillis()
                     )
                 }
 
