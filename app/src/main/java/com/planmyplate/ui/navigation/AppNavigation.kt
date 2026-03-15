@@ -1,5 +1,7 @@
 package com.planmyplate.ui.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
@@ -23,12 +25,22 @@ fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
     NavHost(
         navController = navController,
         startDestination = "sync_check",
-        enterTransition = NavTransitions.enterTransition,
-        exitTransition = NavTransitions.exitTransition,
-        popEnterTransition = NavTransitions.popEnterTransition,
-        popExitTransition = NavTransitions.popExitTransition
+        enterTransition = { NavTransitions.enterTransition(this) },
+        exitTransition = { NavTransitions.exitTransition(this) },
+        popEnterTransition = { NavTransitions.popEnterTransition(this) },
+        popExitTransition = { NavTransitions.popExitTransition(this) }
     ) {
-        composable(route = "main") {
+        composable(
+            route = "main",
+            enterTransition = {
+                // Disable animation when coming from the initial splash/sync check for a seamless transition
+                if (initialState.destination.route?.contains("sync_check") == true) {
+                    EnterTransition.None
+                } else {
+                    NavTransitions.enterTransition(this)
+                }
+            }
+        ) {
             MainScreen(
                 onAddMeal = { navController.navigate("meal_form") },
                 onEditMeal = { sessionId -> navController.navigate("meal_form?sessionId=$sessionId") },
@@ -43,7 +55,15 @@ fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
                     type = NavType.BoolType
                     defaultValue = false
                 }
-            )
+            ),
+            exitTransition = {
+                // Disable animation when moving to main to avoid the "sliding out" effect under the splash screen
+                if (targetState.destination.route == "main") {
+                    ExitTransition.None
+                } else {
+                    NavTransitions.exitTransition(this)
+                }
+            }
         ) { backStackEntry ->
             val fromSettings = backStackEntry.arguments?.getBoolean("fromSettings") ?: false
             val activity = (LocalContext.current as? android.app.Activity)

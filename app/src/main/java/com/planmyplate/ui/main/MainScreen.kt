@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import com.planmyplate.ui.home.HomeScreen
 import com.planmyplate.ui.recipes.RecipesScreen
@@ -21,7 +22,7 @@ fun MainScreen(
     onEditMeal: (Long) -> Unit,
     onOpenSettings: () -> Unit
 ) {
-    var selectedTab by remember { mutableStateOf(MainTab.HOME) }
+    var selectedTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
 
     Scaffold(
         bottomBar = {
