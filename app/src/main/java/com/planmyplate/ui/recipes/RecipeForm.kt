@@ -148,13 +148,6 @@ fun RecipeForm(recipeId: Long? = null, onBack: () -> Unit) {
                                 }
                             )
                         }
-                        DropdownMenuItem(
-                            text = { Text("None") },
-                            onClick = {
-                                viewModel.onDifficultyChanged(null)
-                                expanded = false
-                            }
-                        )
                     }
                 }
             }
