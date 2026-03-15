@@ -2,8 +2,6 @@ package com.planmyplate.ui.mealform
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -19,7 +17,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.planmyplate.PlanMyPlateApp
 import com.planmyplate.model.MealType
@@ -54,6 +51,9 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showMealTypeMenu by remember { mutableStateOf(false) }
+    
+    // Track expansion state for the recipe search dropdown
+    var isRecipeSearchExpanded by remember { mutableStateOf(false) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
@@ -210,39 +210,49 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                 fontWeight = FontWeight.SemiBold
             )
 
-            Column(modifier = Modifier.fillMaxWidth()) {
+            // Searchable Recipe Dropdown
+            ExposedDropdownMenuBox(
+                expanded = isRecipeSearchExpanded && uiState.searchResults.isNotEmpty(),
+                onExpandedChange = { isRecipeSearchExpanded = it },
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 OutlinedTextField(
                     value = uiState.recipeSearchQuery,
-                    onValueChange = { viewModel.onRecipeSearchQueryChanged(it) },
+                    onValueChange = { 
+                        viewModel.onRecipeSearchQueryChanged(it)
+                        isRecipeSearchExpanded = true
+                    },
                     label = { Text("Search Recipes") },
                     modifier = Modifier.fillMaxWidth(),
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    trailingIcon = {
+                        if (uiState.recipeSearchQuery.isNotEmpty()) {
+                            IconButton(onClick = {
+                                viewModel.onRecipeSearchQueryChanged("")
+                                isRecipeSearchExpanded = false
+                            }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear search")
+                            }
+                        }
+                    },
                     shape = RoundedCornerShape(12.dp),
                     colors = fieldColors
                 )
 
                 if (uiState.searchResults.isNotEmpty()) {
-                    Popup(alignment = Alignment.TopStart) {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth(0.9f)
-                                .heightIn(max = 200.dp)
-                                .padding(horizontal = 20.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            tonalElevation = 8.dp,
-                            shadowElevation = 8.dp,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                        ) {
-                            LazyColumn {
-                                items(uiState.searchResults) { recipe ->
-                                    ListItem(
-                                        headlineContent = { Text(recipe.name) },
-                                        modifier = Modifier.clickable {
-                                            viewModel.selectRecipe(recipe)
-                                        }
-                                    )
-                                }
-                            }
+                    ExposedDropdownMenu(
+                        expanded = isRecipeSearchExpanded,
+                        onDismissRequest = { isRecipeSearchExpanded = false }
+                    ) {
+                        uiState.searchResults.forEach { recipe ->
+                            DropdownMenuItem(
+                                text = { Text(recipe.name) },
+                                onClick = {
+                                    viewModel.selectRecipe(recipe)
+                                    isRecipeSearchExpanded = false
+                                },
+                                contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                            )
                         }
                     }
                 }
