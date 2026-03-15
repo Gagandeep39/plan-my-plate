@@ -2,6 +2,7 @@ package com.planmyplate.model
 
 import androidx.room.Embedded
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.Junction
 import androidx.room.PrimaryKey
@@ -13,7 +14,7 @@ data class MealSession(
     @PrimaryKey(autoGenerate = true)
     val sessionId: Long = 0,
     val scheduledTimestamp: Long,
-    val mealType: String,         // e.g., "BREAKFAST", "LUNCH"
+    val mealType: String,
     val isCompleted: Boolean = false,
     val notes: String? = null,
 
@@ -25,24 +26,41 @@ data class MealSession(
 // --- 2. THE BRIDGE TABLE (Many-to-Many Link) ---
 // Connects a Session to a Recipe (or multiple recipes)
 @Entity(
-    tableName = "session_recipe_cross_ref",
-    primaryKeys = ["sessionId", "recipeId"],
-    indices = [Index("recipeId")]
+    tableName = "session_recipes",
+    foreignKeys = [
+        ForeignKey(
+            entity = MealSession::class,
+            parentColumns = ["sessionId"],
+            childColumns = ["sessionId"],
+            onDelete = ForeignKey.CASCADE // Delete the meal? Delete this record.
+        ),
+        ForeignKey(
+            entity = Recipe::class,
+            parentColumns = ["recipeId"],
+            childColumns = ["recipeId"],
+            onDelete = ForeignKey.SET_NULL // Delete the recipe? Keep this record, just break the link.
+        )
+    ],
+    indices = [Index("sessionId"), Index("recipeId")]
 )
-data class SessionRecipeCrossRef(
+data class SessionRecipe(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+
     val sessionId: Long,
-    val recipeId: Long
+    val recipeId: Long?, // Nullable anchor back to the master cookbook
+
+    val recipeNameSnapshot: String // The frozen name for the timeline UI
 )
 
-// --- 3. THE MASTER TIMELINE CONTAINER ---
-// This grabs the Session, crosses the bridge, and grabs the full Recipes (with their ingredients)
+// --- 3. THE TIMELINE CONTAINER ---
 data class SessionWithRecipes(
     @Embedded val session: MealSession,
 
+    // We just pull the SessionRecipe directly now. No Junction needed!
     @Relation(
         parentColumn = "sessionId",
-        entityColumn = "recipeId",
-        associateBy = Junction(SessionRecipeCrossRef::class)
+        entityColumn = "sessionId"
     )
-    val recipes: List<RecipeWithIngredients> // Reuses the container from Recipe.kt!
+    val recipes: List<SessionRecipe>
 )

@@ -7,7 +7,6 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Relation
 
-// --- 1. THE RECIPE TABLE ---
 @Entity(tableName = "recipes")
 data class Recipe(
     @PrimaryKey(autoGenerate = true)
@@ -15,13 +14,10 @@ data class Recipe(
     val name: String,
     val steps: String,
     val comments: String? = null,
-
-    // Audit Fields
     val createdAt: Long = System.currentTimeMillis(),
     var updatedAt: Long = System.currentTimeMillis()
 )
 
-// --- 2. THE INGREDIENT TABLE ---
 @Entity(
     tableName = "ingredients",
     foreignKeys = [
@@ -29,28 +25,24 @@ data class Recipe(
             entity = Recipe::class,
             parentColumns = ["recipeId"],
             childColumns = ["parentRecipeId"],
-            onDelete = ForeignKey.CASCADE // Deleting a recipe deletes its ingredients
+            onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("parentRecipeId")] // Required by Room to keep queries fast
+    indices = [Index("parentRecipeId")]
 )
 data class Ingredient(
     @PrimaryKey(autoGenerate = true)
     val ingredientId: Long = 0,
-    val parentRecipeId: Long, // Links back to the Recipe
+    val parentRecipeId: Long,
     val name: String,
     val amount: String,
-
-    // Audit Fields
     val createdAt: Long = System.currentTimeMillis(),
     var updatedAt: Long = System.currentTimeMillis()
 )
 
-// --- 3. THE CONTAINER (Recipe + Ingredients) ---
-// Not a table! Just a way for Room to bundle the query results.
+// Container to get a full Recipe + Ingredients
 data class RecipeWithIngredients(
     @Embedded val recipe: Recipe,
-
     @Relation(
         parentColumn = "recipeId",
         entityColumn = "parentRecipeId"
