@@ -1,5 +1,6 @@
 package com.planmyplate.ui.recipes
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,7 +19,10 @@ import com.planmyplate.PlanMyPlateApp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RecipesScreen() {
+fun RecipesScreen(
+    onAddRecipe: () -> Unit,
+    onEditRecipe: (Long) -> Unit
+) {
     val context = LocalContext.current
     val app = context.applicationContext as PlanMyPlateApp
     val viewModel: RecipesViewModel = viewModel(
@@ -26,8 +30,6 @@ fun RecipesScreen() {
     )
 
     val recipesWithIngredients by viewModel.recipes.collectAsState(initial = emptyList())
-    var showAddDialog by remember { mutableStateOf(false) }
-    var newRecipeName by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -36,7 +38,7 @@ fun RecipesScreen() {
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
+            FloatingActionButton(onClick = onAddRecipe) {
                 Icon(Icons.Default.Add, contentDescription = "Add Recipe")
             }
         }
@@ -65,52 +67,21 @@ fun RecipesScreen() {
                 items(recipesWithIngredients) { item ->
                     RecipeItem(
                         recipeName = item.recipe.name,
+                        onClick = { onEditRecipe(item.recipe.recipeId) },
                         onDelete = { viewModel.deleteRecipe(item.recipe.recipeId) }
                     )
                 }
             }
         }
     }
-
-    if (showAddDialog) {
-        AlertDialog(
-            onDismissRequest = { showAddDialog = false },
-            title = { Text("Add New Recipe") },
-            text = {
-                OutlinedTextField(
-                    value = newRecipeName,
-                    onValueChange = { newRecipeName = it },
-                    label = { Text("Recipe Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (newRecipeName.isNotBlank()) {
-                            viewModel.addRecipe(newRecipeName)
-                            newRecipeName = ""
-                            showAddDialog = false
-                        }
-                    }
-                ) {
-                    Text("Add")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
 }
 
 @Composable
-fun RecipeItem(recipeName: String, onDelete: () -> Unit) {
+fun RecipeItem(recipeName: String, onClick: () -> Unit, onDelete: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(

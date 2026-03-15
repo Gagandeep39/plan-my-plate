@@ -13,12 +13,6 @@ class RecipesViewModel(private val repository: RecipeRepository) : ViewModel() {
 
     val recipes: Flow<List<RecipeWithIngredients>> = repository.getAllRecipes()
 
-    fun addRecipe(name: String) {
-        viewModelScope.launch {
-            repository.upsertRecipe(Recipe(name = name, steps = ""))
-        }
-    }
-
     fun deleteRecipe(recipeId: Long) {
         viewModelScope.launch {
             repository.deleteRecipe(recipeId)

@@ -12,6 +12,7 @@ import androidx.navigation.navArgument
 import com.planmyplate.PlanMyPlateApp
 import com.planmyplate.ui.main.MainScreen
 import com.planmyplate.ui.mealform.MealForm
+import com.planmyplate.ui.recipes.RecipeForm
 import com.planmyplate.ui.settings.SettingsScreen
 import com.planmyplate.ui.settings.SyncHistoryScreen
 import com.planmyplate.ui.sync.SyncCheckScreen
@@ -24,14 +25,13 @@ fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
 
     NavHost(
         navController = navController,
-        startDestination = "sync_check",
+        startDestination = Screen.SyncCheck.route,
         enterTransition = { NavTransitions.enterTransition(this) },
         exitTransition = { NavTransitions.exitTransition(this) },
         popEnterTransition = { NavTransitions.popEnterTransition(this) },
         popExitTransition = { NavTransitions.popExitTransition(this) }
     ) {
-        composable(
-            route = "main",
+        composable(route = Screen.Main.route,
             enterTransition = {
                 // Disable animation when coming from the initial splash/sync check for a seamless transition
                 if (initialState.destination.route?.contains("sync_check") == true) {
@@ -42,14 +42,16 @@ fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
             }
         ) {
             MainScreen(
-                onAddMeal = { navController.navigate("meal_form") },
-                onEditMeal = { sessionId -> navController.navigate("meal_form?sessionId=$sessionId") },
-                onOpenSettings = { navController.navigate("settings") }
+                onAddMeal = { navController.navigate(Screen.MealForm.createRoute(null)) },
+                onEditMeal = { sessionId -> navController.navigate(Screen.MealForm.createRoute(sessionId)) },
+                onOpenSettings = { navController.navigate(Screen.Settings.route) },
+                onAddRecipe = { navController.navigate(Screen.RecipeForm.createRoute(null)) },
+                onEditRecipe = { recipeId -> navController.navigate(Screen.RecipeForm.createRoute(recipeId)) }
             )
         }
 
         composable(
-            route = "sync_check?fromSettings={fromSettings}",
+            route = Screen.SyncCheck.route,
             arguments = listOf(
                 navArgument("fromSettings") {
                     type = NavType.BoolType
@@ -83,36 +85,36 @@ fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
                     if (fromSettings) {
                         navController.popBackStack()
                     } else {
-                        navController.navigate("main") {
-                            popUpTo("sync_check?fromSettings={fromSettings}") { inclusive = true }
+                        navController.navigate(Screen.Main.route) {
+                            popUpTo(Screen.SyncCheck.route) { inclusive = true }
                         }
                     }
                 },
                 onRestoreComplete = {
                     activity?.recreate()
-                    navController.navigate("main") {
-                        popUpTo("sync_check?fromSettings={fromSettings}") { inclusive = true }
+                    navController.navigate(Screen.Main.route) {
+                        popUpTo(Screen.SyncCheck.route) { inclusive = true }
                     }
                 }
             )
         }
 
-        composable("settings") {
+        composable(Screen.Settings.route) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
-                onOpenSyncHistory = { navController.navigate("sync_history") },
+                onOpenSyncHistory = { navController.navigate(Screen.SyncHistory.route) },
                 onNavigateToSyncCheck = {
-                    navController.navigate("sync_check?fromSettings=true")
+                    navController.navigate(Screen.SyncCheck.createRoute(true))
                 }
             )
         }
 
-        composable("sync_history") {
+        composable(Screen.SyncHistory.route) {
             SyncHistoryScreen(onBack = { navController.popBackStack() })
         }
 
         composable(
-            route = "meal_form?sessionId={sessionId}",
+            route = Screen.MealForm.route,
             arguments = listOf(
                 navArgument("sessionId") {
                     type = NavType.StringType
@@ -124,6 +126,25 @@ fun AppNavigation(syncCheckViewModel: SyncCheckViewModel) {
             val sessionId = backStackEntry.arguments?.getString("sessionId")?.toLongOrNull()
             MealForm(
                 sessionId = sessionId,
+                onBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(
+            route = Screen.RecipeForm.route,
+            arguments = listOf(
+                navArgument("recipeId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val recipeId = backStackEntry.arguments?.getString("recipeId")?.toLongOrNull()
+            RecipeForm(
+                recipeId = recipeId,
                 onBack = {
                     navController.popBackStack()
                 }

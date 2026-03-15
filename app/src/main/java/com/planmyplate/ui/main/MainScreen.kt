@@ -20,7 +20,9 @@ enum class MainTab {
 fun MainScreen(
     onAddMeal: () -> Unit,
     onEditMeal: (Long) -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onAddRecipe: () -> Unit,
+    onEditRecipe: (Long) -> Unit
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
 
@@ -42,7 +44,6 @@ fun MainScreen(
             }
         }
     ) { innerPadding ->
-        // We apply bottom padding to ensure content isn't hidden by the NavigationBar
         Box(modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())) {
             when (selectedTab) {
                 MainTab.HOME -> HomeScreen(
@@ -50,7 +51,10 @@ fun MainScreen(
                     onEditMeal = onEditMeal,
                     onOpenSettings = onOpenSettings
                 )
-                MainTab.RECIPES -> RecipesScreen()
+                MainTab.RECIPES -> RecipesScreen(
+                    onAddRecipe = onAddRecipe,
+                    onEditRecipe = onEditRecipe
+                )
             }
         }
     }

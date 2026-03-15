@@ -1,6 +1,7 @@
 package com.planmyplate.data
 
 import androidx.room.*
+import com.planmyplate.model.Ingredient
 import com.planmyplate.model.Recipe
 import com.planmyplate.model.RecipeWithIngredients
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +18,12 @@ interface RecipeDao {
 
     @Upsert
     suspend fun upsertRecipe(recipe: Recipe): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertIngredients(ingredients: List<Ingredient>)
+
+    @Query("DELETE FROM ingredients WHERE parentRecipeId = :recipeId")
+    suspend fun deleteIngredientsForRecipe(recipeId: Long)
 
     @Query("DELETE FROM recipes WHERE recipeId = :recipeId")
     suspend fun deleteRecipe(recipeId: Long)
