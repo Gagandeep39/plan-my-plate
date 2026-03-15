@@ -7,15 +7,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.SignalCellularAlt
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.planmyplate.PlanMyPlateApp
+import com.planmyplate.model.Recipe
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,11 +66,11 @@ fun RecipesScreen(
                     .fillMaxSize()
                     .padding(paddingValues),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(recipesWithIngredients) { item ->
                     RecipeItem(
-                        recipeName = item.recipe.name,
+                        recipe = item.recipe,
                         onClick = { onEditRecipe(item.recipe.recipeId) },
                         onDelete = { viewModel.deleteRecipe(item.recipe.recipeId) }
                     )
@@ -77,7 +81,7 @@ fun RecipesScreen(
 }
 
 @Composable
-fun RecipeItem(recipeName: String, onClick: () -> Unit, onDelete: () -> Unit) {
+fun RecipeItem(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -91,11 +95,61 @@ fun RecipeItem(recipeName: String, onClick: () -> Unit, onDelete: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = recipeName,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = recipe.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                if (recipe.durationMinutes != null || recipe.difficulty != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (recipe.durationMinutes != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Timer,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "${recipe.durationMinutes} min",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        
+                        if (recipe.difficulty != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.SignalCellularAlt,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = when (recipe.difficulty) {
+                                        "Easy" -> Color(0xFF4CAF50)
+                                        "Medium" -> Color(0xFFFF9800)
+                                        "Hard" -> Color(0xFFF44336)
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = recipe.difficulty,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Default.Delete,

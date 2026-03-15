@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.planmyplate.PlanMyPlateApp
@@ -98,6 +99,57 @@ fun RecipeForm(recipeId: Long? = null, onBack: () -> Unit) {
                 colors = fieldColors,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
             )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = uiState.durationMinutes,
+                    onValueChange = { if (it.all { char -> char.isDigit() }) viewModel.onDurationChanged(it) },
+                    label = { Text("Duration (min)") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = fieldColors,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    prefix = { Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                )
+
+                var expanded by remember { mutableStateOf(false) }
+                val difficulties = listOf("Easy", "Medium", "Hard")
+
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    OutlinedTextField(
+                        value = uiState.difficulty ?: "",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Difficulty") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        colors = fieldColors,
+                        modifier = Modifier.menuAnchor(),
+                        shape = RoundedCornerShape(12.dp),
+                        placeholder = { Text("Select") }
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        difficulties.forEach { selectionOption ->
+                            DropdownMenuItem(
+                                text = { Text(selectionOption) },
+                                onClick = {
+                                    viewModel.onDifficultyChanged(selectionOption)
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
 
             HorizontalDivider()
 

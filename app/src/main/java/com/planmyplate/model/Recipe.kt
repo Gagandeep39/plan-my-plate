@@ -14,6 +14,8 @@ data class Recipe(
     val name: String,
     val steps: String,
     val comments: String? = null,
+    val durationMinutes: Int? = null,
+    val difficulty: String? = null, // Easy, Medium, Hard
     val createdAt: Long = System.currentTimeMillis(),
     var updatedAt: Long = System.currentTimeMillis()
 )

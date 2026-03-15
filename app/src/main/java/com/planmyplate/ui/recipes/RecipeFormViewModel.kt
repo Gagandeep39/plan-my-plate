@@ -24,6 +24,8 @@ data class RecipeFormUiState(
     val name: String = "",
     val steps: String = "",
     val comments: String = "",
+    val durationMinutes: String = "",
+    val difficulty: String? = null,
     val ingredients: List<IngredientDraft> = listOf(IngredientDraft()),
     val isSaved: Boolean = false,
     val isDeleted: Boolean = false,
@@ -52,6 +54,8 @@ class RecipeFormViewModel(
                         name = rwi.recipe.name,
                         steps = rwi.recipe.steps,
                         comments = rwi.recipe.comments ?: "",
+                        durationMinutes = rwi.recipe.durationMinutes?.toString() ?: "",
+                        difficulty = rwi.recipe.difficulty,
                         existingRecipe = rwi.recipe,
                         ingredients = if (rwi.ingredients.isEmpty()) {
                             listOf(IngredientDraft())
@@ -81,6 +85,14 @@ class RecipeFormViewModel(
 
     fun onCommentsChanged(comments: String) {
         _uiState.update { it.copy(comments = comments) }
+    }
+
+    fun onDurationChanged(duration: String) {
+        _uiState.update { it.copy(durationMinutes = duration) }
+    }
+
+    fun onDifficultyChanged(difficulty: String?) {
+        _uiState.update { it.copy(difficulty = difficulty) }
     }
 
     fun addIngredient() {
@@ -118,6 +130,8 @@ class RecipeFormViewModel(
                 name = currentState.name,
                 steps = currentState.steps,
                 comments = currentState.comments.ifBlank { null },
+                durationMinutes = currentState.durationMinutes.toIntOrNull(),
+                difficulty = currentState.difficulty,
                 createdAt = currentState.existingRecipe?.createdAt ?: System.currentTimeMillis(),
                 updatedAt = System.currentTimeMillis()
             )
