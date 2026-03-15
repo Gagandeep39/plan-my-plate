@@ -1,6 +1,8 @@
 package com.planmyplate.ui.home
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -49,8 +51,13 @@ fun HomeScreen(
         }
     }
 
-    // Use alpha to hide the list until it's scrolled to the correct position
+    // Smoothly fade in content once it has scrolled to the correct day
     var isReadyToShow by remember { mutableStateOf(false) }
+    val contentAlpha by animateFloatAsState(
+        targetValue = if (isReadyToShow) 1f else 0f,
+        animationSpec = tween(durationMillis = 500),
+        label = "HomeScreenFadeIn"
+    )
     
     LaunchedEffect(dayPlans) {
         if (dayPlans.isNotEmpty() && !isReadyToShow) {
@@ -68,7 +75,7 @@ fun HomeScreen(
     }
 
     Scaffold(
-        modifier = Modifier.alpha(if (isReadyToShow) 1f else 0f),
+        modifier = Modifier.alpha(contentAlpha),
         topBar = {
             Surface(
                 modifier = Modifier.shadow(4.dp),
@@ -88,7 +95,6 @@ fun HomeScreen(
                                 Icon(Icons.Default.Close, contentDescription = "Clear Selection")
                             }
                         } else {
-                            // Logo in the navigation icon slot to keep it in the left corner
                             Icon(
                                 painter = painterResource(id = R.drawable.ic_launcher_foreground),
                                 contentDescription = null,
