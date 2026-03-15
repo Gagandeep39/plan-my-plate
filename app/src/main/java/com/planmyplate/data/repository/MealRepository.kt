@@ -7,7 +7,6 @@ import com.planmyplate.data.MealDao
 import com.planmyplate.data.worker.CalendarSyncWorker
 import com.planmyplate.data.worker.DriveExportWorker
 import com.planmyplate.model.MealSession
-import com.planmyplate.model.Recipe
 import com.planmyplate.model.SessionRecipe
 import com.planmyplate.model.SessionWithRecipes
 import kotlinx.coroutines.flow.Flow
@@ -46,20 +45,17 @@ class MealRepository(
 
     fun getAllMeals(): Flow<List<SessionWithRecipes>> = mealDao.getAllMeals()
 
-    suspend fun saveMeal(session: MealSession, recipes: List<Recipe>): Long {
+    suspend fun saveMeal(session: MealSession, sessionRecipes: List<SessionRecipe>): Long {
         val sessionId = mealDao.upsertSession(session)
 
         // Replace existing recipes for this session
         mealDao.deleteRecipesForSession(sessionId)
-        val sessionRecipesToInsert = recipes.map { recipe ->
-            SessionRecipe(
-                sessionId = sessionId,
-                recipeId = recipe.recipeId,
-                recipeNameSnapshot = recipe.name
-            )
-        }
-        if (sessionRecipesToInsert.isNotEmpty()) {
-            mealDao.insertSessionRecipes(sessionRecipesToInsert)
+        
+        // Ensure the sessionId is correctly set for all linked recipes
+        val toInsert = sessionRecipes.map { it.copy(sessionId = sessionId) }
+        
+        if (toInsert.isNotEmpty()) {
+            mealDao.insertSessionRecipes(toInsert)
         }
 
         if (isCalendarAuthorized()) {
@@ -75,7 +71,6 @@ class MealRepository(
     suspend fun deleteMeal(session: MealSession) {
         val eventId = mealDao.getCalendarEventId(session.sessionId)
         
-        // Schedule deletion in calendar
         if (eventId != null && isCalendarAuthorized()) {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)

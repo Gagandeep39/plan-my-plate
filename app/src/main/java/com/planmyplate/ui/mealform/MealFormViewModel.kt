@@ -8,6 +8,7 @@ import com.planmyplate.data.repository.RecipeRepository
 import com.planmyplate.model.MealSession
 import com.planmyplate.model.MealType
 import com.planmyplate.model.Recipe
+import com.planmyplate.model.SessionRecipe
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,7 +22,7 @@ data class MealFormUiState(
     val mealType: MealType = MealType.BREAKFAST,
     val hour: Int = 9,
     val minute: Int = 0,
-    val selectedRecipes: List<Recipe> = emptyList(),
+    val selectedRecipes: List<SessionRecipe> = emptyList(), // Now using SessionRecipe directly
     val recipeSearchQuery: String = "",
     val searchResults: List<Recipe> = emptyList(),
     val notes: String = "",
@@ -52,22 +53,13 @@ class MealFormViewModel(
                 swr?.let { sessionWithRecipes ->
                     val cal = Calendar.getInstance().apply { timeInMillis = sessionWithRecipes.session.scheduledTimestamp }
                     
-                    // Note: sessionWithRecipes.recipes contains SessionRecipe (snapshots).
-                    // For the form, we ideally want the Recipe objects if they still exist.
-                    val recipes = sessionWithRecipes.recipes.map { sr ->
-                        // Attempt to find original recipe, otherwise create a dummy one with the snapshot name
-                        sr.recipeId?.let { rid ->
-                            recipeRepository.getRecipeWithIngredients(rid)?.recipe
-                        } ?: Recipe(recipeId = 0, name = sr.recipeNameSnapshot, steps = "")
-                    }
-
                     _uiState.update { 
                         it.copy(
                             date = cal,
                             mealType = try { MealType.valueOf(sessionWithRecipes.session.mealType) } catch (e: Exception) { MealType.LUNCH },
                             hour = cal.get(Calendar.HOUR_OF_DAY),
                             minute = cal.get(Calendar.MINUTE),
-                            selectedRecipes = recipes,
+                            selectedRecipes = sessionWithRecipes.recipes, // No mapping needed!
                             notes = sessionWithRecipes.session.notes ?: "",
                             mealSession = sessionWithRecipes.session
                         )
@@ -108,10 +100,20 @@ class MealFormViewModel(
     }
 
     fun selectRecipe(recipe: Recipe) {
-        if (!_uiState.value.selectedRecipes.any { it.recipeId == recipe.recipeId && it.recipeId != 0L }) {
+        // Only add if not already selected (check recipeId for existing links)
+        val isAlreadySelected = _uiState.value.selectedRecipes.any { 
+            it.recipeId != null && it.recipeId == recipe.recipeId 
+        }
+
+        if (!isAlreadySelected) {
+            val snapshot = SessionRecipe(
+                sessionId = _uiState.value.sessionId ?: 0,
+                recipeId = recipe.recipeId,
+                recipeNameSnapshot = recipe.name
+            )
             _uiState.update {
                 it.copy(
-                    selectedRecipes = it.selectedRecipes + recipe,
+                    selectedRecipes = it.selectedRecipes + snapshot,
                     recipeSearchQuery = "",
                     searchResults = emptyList()
                 )
@@ -119,11 +121,9 @@ class MealFormViewModel(
         }
     }
 
-    fun removeRecipe(recipe: Recipe) {
+    fun removeRecipe(sessionRecipe: SessionRecipe) {
         _uiState.update {
-            it.copy(selectedRecipes = it.selectedRecipes.filterNot { r -> 
-                if (r.recipeId != 0L) r.recipeId == recipe.recipeId else r.name == recipe.name 
-            })
+            it.copy(selectedRecipes = it.selectedRecipes - sessionRecipe)
         }
     }
 

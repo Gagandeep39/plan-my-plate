@@ -1,7 +1,5 @@
 package com.planmyplate.ui.mealform
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,6 +23,7 @@ import androidx.compose.ui.window.Popup
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.planmyplate.PlanMyPlateApp
 import com.planmyplate.model.MealType
+import com.planmyplate.model.SessionRecipe
 import com.planmyplate.util.DatePickerMapper
 import java.text.SimpleDateFormat
 import java.util.*
@@ -211,7 +210,6 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                 fontWeight = FontWeight.SemiBold
             )
 
-            // Searchable Dropdown
             Column(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
                     value = uiState.recipeSearchQuery,
@@ -250,10 +248,9 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                 }
             }
 
-            // Selected Recipes Chips
             if (uiState.selectedRecipes.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    uiState.selectedRecipes.forEach { recipe ->
+                    uiState.selectedRecipes.forEach { sessionRecipe ->
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.surface,
@@ -271,14 +268,14 @@ fun MealForm(sessionId: Long? = null, onBack: () -> Unit) {
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Text(
-                                    text = recipe.name,
+                                    text = sessionRecipe.recipeNameSnapshot,
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.weight(1f)
                                 )
-                                IconButton(onClick = { viewModel.removeRecipe(recipe) }) {
+                                IconButton(onClick = { viewModel.removeRecipe(sessionRecipe) }) {
                                     Icon(
                                         Icons.Default.Close,
                                         contentDescription = "Remove",
