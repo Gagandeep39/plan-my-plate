@@ -34,11 +34,24 @@ fun RecipesScreen(
     )
 
     val recipesWithIngredients by viewModel.recipes.collectAsState(initial = emptyList())
+    var recipeToDelete by remember { mutableStateOf<Long?>(null) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("My Recipes", fontWeight = FontWeight.Bold) }
+                title = {
+                    Column {
+                        Text("My Recipes", fontWeight = FontWeight.Bold)
+                        val count = recipesWithIngredients.size
+                        val countText = "$count recipes"
+                        Text(
+                            countText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -65,98 +78,152 @@ fun RecipesScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                contentPadding = PaddingValues(0.dp),
             ) {
-                items(recipesWithIngredients) { item ->
+                items(recipesWithIngredients.size, key = { idx -> recipesWithIngredients[idx].recipe.recipeId }) { index ->
+                    if (index > 0) {
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    }
+                    val item = recipesWithIngredients[index]
                     RecipeItem(
                         recipe = item.recipe,
+                        ingredients = item.ingredients,
                         onClick = { onEditRecipe(item.recipe.recipeId) },
-                        onDelete = { viewModel.deleteRecipe(item.recipe.recipeId) }
+                        onDelete = { recipeToDelete = item.recipe.recipeId }
                     )
                 }
             }
+        }
+
+        // Delete confirmation dialog
+        if (recipeToDelete != null) {
+            AlertDialog(
+                onDismissRequest = { recipeToDelete = null },
+                title = { Text("Delete Recipe") },
+                text = { Text("Are you sure you want to delete this recipe?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.deleteRecipe(recipeToDelete!!)
+                        recipeToDelete = null
+                    }) {
+                        Text("Delete", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { recipeToDelete = null }) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
     }
 }
 
 @Composable
-fun RecipeItem(recipe: Recipe, onClick: () -> Unit, onDelete: () -> Unit) {
-    Card(
+fun RecipeItem(
+    recipe: Recipe,
+    ingredients: List<com.planmyplate.model.Ingredient>,
+    onClick: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val difficultyColor = when (recipe.difficulty) {
+        "Easy" -> Color(0xFF4CAF50)
+        "Medium" -> Color(0xFFFF9800)
+        "Hard" -> Color(0xFFF44336)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    ListItem(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
+            .clickable(onClick = onClick)
+            .padding(vertical = 2.dp, horizontal = 0.dp),
+        headlineContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = recipe.name,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
                 )
-                
-                if (recipe.durationMinutes != null || recipe.difficulty != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                if (!recipe.difficulty.isNullOrBlank()) {
+                    Surface(
+                        color = difficultyColor.copy(alpha = 0.15f),
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.padding(start = 8.dp)
                     ) {
-                        if (recipe.durationMinutes != null) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Default.Timer,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "${recipe.durationMinutes} min",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.SignalCellularAlt,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = difficultyColor
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = recipe.difficulty,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = difficultyColor,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
-                        
-                        if (recipe.difficulty != null) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Default.SignalCellularAlt,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = when (recipe.difficulty) {
-                                        "Easy" -> Color(0xFF4CAF50)
-                                        "Medium" -> Color(0xFFFF9800)
-                                        "Hard" -> Color(0xFFF44336)
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    }
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
+                    }
+                }
+            }
+        },
+        supportingContent = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    if (recipe.durationMinutes != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Timer,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "${recipe.durationMinutes} min",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                if (ingredients.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Column(modifier = Modifier.padding(start = 4.dp)) {
+                        ingredients.forEach { ingredient ->
+                            Row(modifier = Modifier.padding(vertical = 1.dp)) {
                                 Text(
-                                    text = recipe.difficulty,
+                                    text = "• ",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                Text(
+                                    text = ingredient.name,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                if (ingredient.amount.isNotBlank()) {
+                                    Text(
+                                        text = " (${ingredient.amount})",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
-
-            IconButton(onClick = onDelete) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = MaterialTheme.colorScheme.error
-                )
-            }
         }
-    }
+        // No trailingContent (delete button removed)
+    )
 }
