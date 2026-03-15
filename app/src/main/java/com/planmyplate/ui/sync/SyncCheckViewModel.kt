@@ -71,11 +71,10 @@ class SyncCheckViewModel(
 
         latestCloudTimestamp = cloudInfo.modifiedTimeMs
 
-        // 2. Empty local DB - always restore if cloud data is available
-        val localMealCount = withContext(Dispatchers.IO) {
-            AppDatabase.getDatabase(context).mealDao().getMealCount()
-        }
-        if (localMealCount == 0) {
+        // 2. Generic empty local DB check
+        val isLocalEmpty = AppDatabase.getDatabase(context).isDatabaseEmpty()
+        
+        if (isLocalEmpty) {
             _state.value = SyncCheckState.Restoring
             restoreFromCloud()
             return
